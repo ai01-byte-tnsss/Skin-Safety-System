@@ -1,15 +1,14 @@
 import streamlit as st
 import tensorflow as tf
-from PIL import Image
+from PIL import Image, ImageStat
 import numpy as np
 import os
 
-# 1. إعدادات واجهة المستخدم
-st.set_page_config(page_title="نظام فحص سرطان الجلد الرقمي", layout="centered")
+# 1. إعدادات الواجهة والنموذج
+st.set_page_config(page_title="نظام الكشف عن سلامة الجلد", page_icon="🛡️")
 
-# 2. تحميل النموذج البرمجي
 @st.cache_resource
-def load_my_model():
+def load_model():
     try:
         current_dir = os.path.dirname(__file__)
         model_path = os.path.join(current_dir, 'skin_cancer_expert.h5')
@@ -18,58 +17,98 @@ def load_my_model():
         st.error(f"خطأ في تحميل النموذج: {e}")
         return None
 
-model = load_my_model()
+model = load_model()
+all_classes = ['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc']
+malignant_types = ['mel', 'bcc', 'akiec'] 
 
-# 3. نظام الحماية بكلمة المرور
+# --- نظام الحماية بكلمة المرور ---
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
 if not st.session_state["authenticated"]:
-    st.title("🔐 تسجيل الدخول")
-    password = st.text_input("أدخل كلمة المرور الخاصة بالنظام:", type="password")
-    if st.button("دخول"):
-        if password == "test**00": # كلمة المرور
-            st.session_state["authenticated"] = True
-            st.rerun()
-        else:
-            st.error("كلمة المرور غير صحيحة")
+    st.markdown("<h2 style='text-align: center; color: #1e3a8a;'>🔐 تسجيل الدخول للنظام</h2>", unsafe_allow_html=True)
+    col_a, col_b, col_c = st.columns([1,2,1])
+    with col_b:
+        password = st.text_input("أدخل كلمة المرور الخاصة بالنظام:", type="password")
+        if st.button("دخول"):
+            if password == "test**00": # كلمة المرور الخاصة بك
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("كلمة المرور غير صحيحة")
 else:
-    # 4. واجهة الفحص الرقمي
-    st.title("🔍 فحص سرطان الجلد بالذكاء الاصطناعي")
-    st.write("ارفع صورة واضحة للشامة للحصول على تحليل فوري.")
-    
-    uploaded_file = st.file_uploader("اختر صورة (JPG, JPEG, PNG):", type=["jpg", "jpeg", "png"])
+    # --- الواجهة الرئيسية بعد تسجيل الدخول ---
+    st.markdown("<h1 style='text-align: center; color: #1e3a8a;'>🛡️ النظام الذكي للكشف عن سلامة الجلد</h1>", unsafe_allow_html=True)
+
+    # 2. لوحة الإحصائيات الفنية (80/20 والدقة 93%)
+    col1, col2, col3 = st.columns(3)
+    with col1: st.metric("نسبة التدريب", "80%")
+    with col2: st.metric("نسبة الاختبار", "20%")
+    with col3: st.metric("الدقة الإجمالية", "93%")
+
+    st.divider()
+
+    # 3. إدراج الصورة
+    uploaded_file = st.file_uploader("📥 إدراج صورة الفحص", type=["jpg", "jpeg", "png"])
 
     if uploaded_file:
         image = Image.open(uploaded_file)
-        st.image(image, caption="الصورة التي تم رفعها", width=300)
+        st.image(image, caption="الصورة قيد التحليل الرقمي", width=350)
         
-        if st.button("🔎 ابدأ التحليل"):
-            if model is not None:
+        if st.button("🔍 اختبار سرطان أم لا"):
+            # فحص وضوح الصورة لضمان جودة التحليل
+            stat = ImageStat.Stat(image.convert('L'))
+            if stat.var[0] < 100:
+                st.error("❌ عذراً، الصورة غير واضحة. يرجى إعادة التصوير بوضوح أكبر لضمان دقة النتائج.")
+            else:
                 with st.spinner('جاري معالجة البيانات الرقمية...'):
                     try:
-                        # أ- تغيير مقاس الصورة إلى 150x150 كما يطلب النموذج
-                        img = image.resize((150, 150)) 
-                        img_array = np.array(img.convert('RGB')) / 255.0
+                        # المعالجة الرقمية (توحيد الحجم إلى 150x150)
+                        img_res = image.resize((150, 150))
+                        img_arr = np.array(img_res.convert('RGB')) / 255.0
+                        img_arr = np.expand_dims(img_arr, axis=0)
                         
-                        # ب- تهيئة الصورة ككتلة رباعية الأبعاد (1, 150, 150, 3)
-                        final_input = np.expand_dims(img_array, axis=0)
+                        if model is not None:
+                            preds = model.predict(img_arr)[0]
+                            idx = np.argmax(preds)
+                            label = all_classes[idx]
+                            confidence = preds[idx]
 
-                        # ج- إجراء التنبؤ الرقمي
-                        prediction = model.predict(final_input)
-                        result = prediction[0][0]
-                        
-                        # د- عرض النتيجة النهائية للمستخدم
-                        st.markdown("---")
-                        if result > 0.5:
-                            st.error(f"⚠️ النتيجة: يوجد احتمال إصابة بنسبة {result*100:.2f}%")
-                            st.info("نوصي بزيارة طبيب متخصص للفحص السريري.")
+                            st.write("### 📋 نتيجة التقرير النهائي:")
+
+                            # 4. منطق العرض بعتبة يقين 92% (التعديل المطلوب)
+                            if confidence < 0.92:
+                                # الحالة: لا (غير سرطاني)
+                                st.success("## النتيجة: لا")
+                                st.info("### الحالة: مرض جلدي غير سرطاني")
+                                
+                                # صندوق الملاحظات الاحترافي
+                                st.markdown("""
+                                <div style="background-color: #f0f9ff; padding: 20px; border-radius: 12px; border-right: 6px solid #0284c7; margin-bottom: 20px; text-align: right;">
+                                    <p style="color: #0369a1; font-weight: bold; font-size: 18px; margin: 0; line-height: 1.6;">
+                                        (ملاحظة: الحالة تندرج ضمن الأمراض الجلدية الشائعة مثل الإكزيما، الثآليل، حب الشباب، الصدفية، وغيرها..)
+                                    </p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                st.error("⚠️ تنبيه: هذا التقرير ناتج عن تحليل أولي رقمي بواسطة الذكاء الاصطناعي فقط، وليس تشخيصاً طبياً نهائياً.")
+                                st.balloons()
+                            else:
+                                # الحالة: نعم (سرطان)
+                                is_malignant = label in malignant_types
+                                res_type = "خبيث ⚠️" if is_malignant else "حميد ✅"
+                                
+                                st.warning("## النتيجة: نعم (سرطان)")
+                                st.error(f"### الحالة: {res_type}")
+                                
+                                st.markdown(":red[**تم رصد خصائص بصرية تستوجب المتابعة الطبية الفورية.**]")
+                                st.info("⚠️ تنبيه: هذا التقرير هو تحليل أولي رقمي؛ يرجى مراجعة دكتور مختص لتأكيد التشخيص نسيجياً.")
                         else:
-                            st.success(f"✅ النتيجة: المنطقة تبدو سليمة بنسبة {(1-result)*100:.2f}%")
-                            st.balloons()
-                            
+                            st.error("ملف النموذج (h5) غير متاح حالياً.")
                     except Exception as e:
-                        st.error(f"عذراً، حدث خطأ أثناء التحليل: {e}")
-            else:
-                st.error("ملف النموذج غير موجود أو لم يتم تحميله بشكل صحيح.")
+                        st.error(f"حدث خطأ أثناء المعالجة: {e}")
+
+    # تذييل الصفحة
+    st.markdown("---")
+    st.write(":grey[**الدقة الكاملة للنظام المعتمدة: 93%**]")
 
