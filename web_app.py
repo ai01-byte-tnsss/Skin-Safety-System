@@ -47,7 +47,7 @@ if not st.session_state["authenticated"]:
         else:
             st.error("خطأ!")
 else:
-    st.markdown("<h1 style='text-align: center; color: #1e3a8a;'>🔬 نظام الفحص الذكي (الأولوية القصوى للأمان الطبي)</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #1e3a8a;'>🔬 نظام الفحص الذكي (إصدار الحماية الفائقة)</h1>", unsafe_allow_html=True)
 
     # إحصائيات النظام
     col1, col2, col3 = st.columns(3)
@@ -70,32 +70,41 @@ else:
                 img_arr = np.expand_dims(img_arr, axis=0)
                 
                 if model is not None:
-                    preds = model.predict(img_arr)[0]
+                    raw_preds = model.predict(img_arr)[0]
                     all_labels = ['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc']
-                    results = dict(zip(all_labels, preds))
                     
-                    # --- منطق "الأولوية للسرطان" الحازم (عتبة 55%) ---
-                    cancer_probs = {k: results[k] for k in cancer_info.keys()}
+                    # --- الحل النهائي: تضخيم احتمالات السرطان (Boost Factor) ---
+                    # سنقوم بضرب أي نسبة للسرطان في 1.5 لرفع حساسيتها
+                    boosted_results = {}
+                    boost_factor = 1.5 
+                    
+                    for i, label in enumerate(all_labels):
+                        if label in cancer_info:
+                            boosted_results[label] = min(raw_preds[i] * boost_factor, 1.0) # تضخيم
+                        else:
+                            boosted_results[label] = raw_preds[i] # ترك الحالات السليمة كما هي
+
+                    # تحديد أعلى خطر سرطاني بعد التضخيم
+                    cancer_probs = {k: boosted_results[k] for k in cancer_info.keys()}
                     max_cancer_label = max(cancer_probs, key=cancer_probs.get)
                     max_cancer_val = cancer_probs[max_cancer_label]
 
                     st.write("### 📋 التقرير النهائي للمعاينة:")
 
-                    # القاعدة الذهبية: إذا كان احتمال السرطان >= 55%، نلغي أي نتائج حميدة أخرى مهما كانت نسبتها
-                    if max_cancer_val >= 0.55:
+                    # --- منطق الأمان الجديد (عتبة 50% بعد التضخيم) ---
+                    if max_cancer_val >= 0.50:
                         name, desc = cancer_info[max_cancer_label]
                         st.warning(f"## التصنيف: اشتباه {name} ⚠️")
-                        st.error(f"**تنبيه حرج:** تم رصد مؤشرات رقمية تقع في نطاق الاشتباه (أعلى من 55%).")
-                        st.info(f"**تعريف الحالة:** {desc}")
+                        st.error(f"**تنبيه طبي:** تم رصد ملامح بصرية تتطابق مع مؤشرات الخطر.")
+                        st.info(f"**عن الحالة:** {desc}")
                         st.progress(float(max_cancer_val))
-                        st.write(f"قوة المطابقة الرقمية للحالة: {max_cancer_val*100:.1f}%")
-                        st.markdown("> **ملاحظة هامة:** في هذا النظام، يتم إعطاء الأولوية للتحذير من السرطان لضمان أعلى مستويات الأمان.")
+                        st.write(f"قوة الاشتباه الرقمي: {max_cancer_val*100:.1f}%")
                     
-                    # إذا كانت جميع احتمالات السرطان تحت الـ 55%، ننتقل للتشخيص الحميد
                     else:
-                        idx = np.argmax(preds)
+                        # اختيار الحالة الحميدة ذات النسبة الأعلى
+                        idx = np.argmax(raw_preds)
                         label = all_labels[idx]
-                        confidence = preds[idx]
+                        confidence = raw_preds[idx]
                         
                         if label in benign_info:
                             name, desc = benign_info[label]
@@ -105,8 +114,8 @@ else:
                         st.success(f"## التصنيف: {name} ✅")
                         st.info(f"**عن هذه الحالة:** {desc}")
                         st.progress(float(confidence))
-                        st.write(f"نسبة الطمأنينة: {confidence*100:.1f}%")
+                        st.write(f"نسبة الطمأنينة الرقمية: {confidence*100:.1f}%")
                         st.balloons()
                     
                     st.write("---")
-                    st.caption("تحذير: هذا البرنامج أداة تقنية مساعدة وليس تشخيصاً طبياً نهائياً.")
+                    st.caption("تحذير: هذا البرنامج أداة تقنية مساعدة لرفع مستوى الوعي ولا يغني عن الطبيب.")
