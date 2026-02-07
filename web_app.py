@@ -1,11 +1,11 @@
 import streamlit as st
 import tensorflow as tf
-from PIL import Image, ImageStat
+from PIL import Image
 import numpy as np
 import os
 
 # 1. إعدادات الواجهة
-st.set_page_config(page_title="نظام التشخيص الذكي للجلد", page_icon="🔬")
+st.set_page_config(page_title="نظام الأمان القصوى للجلد", page_icon="🛡️")
 
 @st.cache_resource
 def load_model():
@@ -19,10 +19,10 @@ def load_model():
 
 model = load_model()
 
-# --- تعريف البيانات والشروحات ---
+# شروحات الحالات
 cancer_info = {
     'mel': ('سرطان الجلد الصبغي (Melanoma)', 'أخطر أنواع سرطان الجلد، يتطلب تدخل طبي عاجل.'),
-    'bcc': ('سرطان الخلايا القاعدية (BCC)', 'نوع ينمو ببطء ويجب إزالته جراحياً لمنع تضرر الأنسجة المحيطة.'),
+    'bcc': ('سرطان الخلايا القاعدية (BCC)', 'نوع ينمو ببطء ويجب إزالته جراحياً لمنع تضرر الأنسجة.'),
     'akiec': ('التقرن الشعاعي (Pre-Cancer)', 'آفات تعتبر مرحلة ما قبل السرطان، علاجها يمنع تحولها لورم خبيث.')
 }
 
@@ -44,78 +44,60 @@ if not st.session_state["authenticated"]:
         if password == "test**00": 
             st.session_state["authenticated"] = True
             st.rerun()
-        else:
-            st.error("خطأ!")
 else:
-    st.markdown("<h1 style='text-align: center; color: #1e3a8a;'>🔬 نظام الفحص الذكي (إصدار الحماية الفائقة)</h1>", unsafe_allow_html=True)
-
-    # إحصائيات النظام
-    col1, col2, col3 = st.columns(3)
-    with col1: st.metric("قوة التدريب", "80%")
-    with col2: st.metric("حجم الاختبار", "20%")
-    with col3: st.metric("دقة النموذج", "93%")
-
-    st.divider()
+    st.markdown("<h1 style='text-align: center; color: #1e3a8a;'>🛡️ نظام الفحص (بروتوكول الاستبعاد الطبي)</h1>", unsafe_allow_html=True)
 
     uploaded_file = st.file_uploader("📥 إدراج صورة الفحص", type=["jpg", "jpeg", "png"])
 
     if uploaded_file:
         image = Image.open(uploaded_file)
-        st.image(image, caption="الصورة التي يتم تحليلها", width=350)
+        st.image(image, caption="الصورة تحت المجهر الرقمي", width=350)
         
-        if st.button("🔍 بدء التحليل العميق"):
-            with st.spinner('جاري فحص الأنماط...'):
+        if st.button("🔍 فحص شامل"):
+            with st.spinner('جاري تطبيق فحص الأمان...'):
                 img_res = image.resize((150, 150))
                 img_arr = np.array(img_res.convert('RGB')) / 255.0
                 img_arr = np.expand_dims(img_arr, axis=0)
                 
                 if model is not None:
-                    raw_preds = model.predict(img_arr)[0]
+                    preds = model.predict(img_arr)[0]
                     all_labels = ['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc']
-                    
-                    # --- الحل النهائي: تضخيم احتمالات السرطان (Boost Factor) ---
-                    # سنقوم بضرب أي نسبة للسرطان في 1.5 لرفع حساسيتها
-                    boosted_results = {}
-                    boost_factor = 1.5 
-                    
-                    for i, label in enumerate(all_labels):
-                        if label in cancer_info:
-                            boosted_results[label] = min(raw_preds[i] * boost_factor, 1.0) # تضخيم
-                        else:
-                            boosted_results[label] = raw_preds[i] # ترك الحالات السليمة كما هي
+                    results = dict(zip(all_labels, preds))
 
-                    # تحديد أعلى خطر سرطاني بعد التضخيم
-                    cancer_probs = {k: boosted_results[k] for k in cancer_info.keys()}
+                    # ---------------------------------------------------------
+                    # الحل الجذري: بروتوكول الاستبعاد (Rule-based Override)
+                    # ---------------------------------------------------------
+                    # سنبحث عن أعلى نسبة بين السرطانات
+                    cancer_probs = {k: results[k] for k in cancer_info.keys()}
                     max_cancer_label = max(cancer_probs, key=cancer_probs.get)
                     max_cancer_val = cancer_probs[max_cancer_label]
 
-                    st.write("### 📋 التقرير النهائي للمعاينة:")
-
-                    # --- منطق الأمان الجديد (عتبة 50% بعد التضخيم) ---
-                    if max_cancer_val >= 0.50:
+                    # إذا اكتشف النظام أي مؤشر سرطان يتجاوز 15% فقط (عتبة حساسة جداً)
+                    # وكان هذا المؤشر هو الأقوى بين احتمالات الخطر، سنعطيه الأولوية
+                    if max_cancer_val > 0.15: 
                         name, desc = cancer_info[max_cancer_label]
-                        st.warning(f"## التصنيف: اشتباه {name} ⚠️")
-                        st.error(f"**تنبيه طبي:** تم رصد ملامح بصرية تتطابق مع مؤشرات الخطر.")
+                        st.warning(f"## تحذير: تم رصد مؤشرات اشتباه {name} ⚠️")
+                        st.error(f"**قرار النظام:** إعطاء الأولوية للتحذير لوجود سمات بصرية مقلقة.")
                         st.info(f"**عن الحالة:** {desc}")
                         st.progress(float(max_cancer_val))
-                        st.write(f"قوة الاشتباه الرقمي: {max_cancer_val*100:.1f}%")
-                    
+                        st.write(f"قوة المطابقة الرقمية: {max_cancer_val*100:.1f}%")
+                        st.markdown("> **تنبيه:** تم تفعيل بروتوكول الأمان لضمان عدم إهمال أي اشتباه سرطاني.")
+
                     else:
-                        # اختيار الحالة الحميدة ذات النسبة الأعلى
-                        idx = np.argmax(raw_preds)
+                        # إذا كانت احتمالات السرطان شبه منعدمة (أقل من 15%)
+                        idx = np.argmax(preds)
                         label = all_labels[idx]
-                        confidence = raw_preds[idx]
+                        confidence = preds[idx]
                         
                         if label in benign_info:
                             name, desc = benign_info[label]
                         else:
-                            name, desc = ("حالة جلدية آمنة", "تظهر الصورة ملامح لحالة جلدية شائعة وهي غير سرطانية.")
+                            name, desc = ("جلد سليم", "الحالة تظهر خصائص بصرية آمنة تماماً.")
                         
-                        st.success(f"## التصنيف: {name} ✅")
-                        st.info(f"**عن هذه الحالة:** {desc}")
+                        st.success(f"## النتيجة: {name} ✅")
+                        st.info(f"**عن الحالة:** {desc}")
                         st.progress(float(confidence))
-                        st.write(f"نسبة الطمأنينة الرقمية: {confidence*100:.1f}%")
                         st.balloons()
-                    
+
                     st.write("---")
-                    st.caption("تحذير: هذا البرنامج أداة تقنية مساعدة لرفع مستوى الوعي ولا يغني عن الطبيب.")
+                    st.caption("تنبيه: هذا النظام مصمم لتقليل الأخطاء الطبية عبر التحذير المبكر.")
