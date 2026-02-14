@@ -4,13 +4,13 @@ from PIL import Image
 import numpy as np
 import os
 
-# 1. إعدادات الواجهة
+# 1. إعدادات الواجهة الاحترافية
 st.set_page_config(page_title="Skin Safety Expert", page_icon="🩺", layout="centered")
 st.title("🩺 Skin Disease Expert System")
-st.markdown(f"### **الدقة الإجمالية للنظام: 53.57%**") #
+st.markdown(f"### **نظام تحليل وتصنيف الأمراض الجلدية**")
 st.write("---")
 
-# 2. تحميل النموذج
+# 2. تحميل النموذج برمجياً
 @st.cache_resource
 def load_model():
     model_path = "skin_expert_refined.tflite"
@@ -22,6 +22,7 @@ def load_model():
 
 interpreter = load_model()
 
+# قائمة الأصناف الـ 24 (تأكد أنها مطابقة لترتيب مجلدات التدريب)
 labels = [
     'Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous Disease', 
     'Cellulitis Impetigo', 'Eczema', 'Exanthems and Drug Eruptions', 'Hair Loss Alopecia', 
@@ -33,31 +34,24 @@ labels = [
 
 malignant_types = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
 
-# 3. واجهة رفع الصور
-uploaded_file = st.file_uploader("ارفع صورة الجلد للفحص...", type=["jpg", "jpeg", "png"])
+# 3. واجهة الرفع والمعالجة
+uploaded_file = st.file_uploader("ارفع صورة الجلد للفحص التحليلي...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None and interpreter is not None:
     image = Image.open(uploaded_file).convert('RGB')
     st.image(image, caption='الصورة المرفوعة', use_container_width=True)
     
     if st.button('بدء التشخيص التحليلي'):
+        # كشف تفاصيل النموذج تلقائياً لمنع أعطال المصفوفة
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
-        
-        # قراءة الأبعاد والنوع (FLOAT16) ديناميكياً
         h, w = input_details[0]['shape'][1], input_details[0]['shape'][2]
-        required_dtype = input_details[0]['dtype']
+        required_dtype = input_details[0]['dtype'] # التعامل مع FLOAT16
         
-        # --- الحل الجذري لمشكلة التشخيص الخاطئ (The Secret Sauce) ---
-        # 1. تغيير الحجم بدقة عالية
+        # معالجة الصورة بأعلى جودة (LANCZOS) وتطبيع معيار MobileNet
         img = image.resize((w, h), Image.LANCZOS)
         img_array = np.array(img).astype(np.float32)
-        
-        # 2. تطبيق معادلة MobileNet الرسمية: (pixel / 127.5) - 1.0
-        # هذه المعادلة هي التي تجعل النموذج يفرق بين الألوان بدقة
-        img_array = (img_array / 127.5) - 1.0
-        
-        # 3. تحويل النوع ليتوافق مع FLOAT16 وإضافة بعد الدفعة
+        img_array = (img_array / 127.5) - 1.0 # المعالجة الرسمية للنماذج المطورة
         img_array = np.expand_dims(img_array, axis=0).astype(required_dtype)
         
         try:
@@ -65,24 +59,28 @@ if uploaded_file is not None and interpreter is not None:
             interpreter.invoke()
             output_data = interpreter.get_tensor(output_details[0]['index'])
             
-            # استخراج النتائج (Probabilities)
+            # --- ميزة كشف العطل وترتيب الأصناف ---
             probabilities = output_data[0]
-            result_idx = np.argmax(probabilities)
-            prediction_name = labels[result_idx]
-            confidence = probabilities[result_idx] * 100 # نسبة الثقة
+            # الحصول على أعلى 3 احتمالات لضمان كشف "تداخل الأصناف"
+            top_3_indices = np.argsort(probabilities)[-3:][::-1]
             
-            st.write(f"### 🔍 التشخيص المكتشف: {prediction_name}")
-            # st.write(f"**نسبة الثقة في التشخيص:** {confidence:.2f}%")
+            st.write("### 📊 نتائج التحليل الاحتمالي:")
+            for i in top_3_indices:
+                score = probabilities[i] * 100
+                st.info(f"النوع: **{labels[i]}** | نسبة الثقة: **{score:.2f}%**")
             
-            if prediction_name in malignant_types:
-                st.error("تصنيف الحالة: خبيث (يستوجب فحصاً طبياً فورياً)")
+            # النتيجة النهائية (صاحبة أعلى احتمال)
+            final_pred = labels[top_3_indices[0]]
+            
+            st.write("---")
+            if final_pred in malignant_types:
+                st.error(f"⚠️ التشخيص النهائي: {final_pred} (تصنيف خبيث)")
             else:
-                st.success("تصنيف الحالة: حميد")
+                st.success(f"✅ التشخيص النهائي: {final_pred} (تصنيف حميد)")
+
         except Exception as e:
-            st.error(f"خطأ في معالجة البيانات: {e}")
+            st.error(f"فشل في مصفوفة البيانات: {e}")
 
-# 4. الملاحظة الطبية
+# 4. ملاحظة إخلاء المسؤولية
 st.write("---")
-st.warning("⚠️ ملاحظة إخلاء مسؤولية: هذا النظام يعتمد على الذكاء الاصطناعي للأغراض البحثية فقط وليس تشخيصاً طبياً حقيقياً.")
-
-
+st.warning("⚠️ ملاحظة: هذا النظام يعتمد على الذكاء الاصطناعي للأغراض البحثية والتعليمية فقط وليس تشخيصاً طبياً حقيقياً.")
