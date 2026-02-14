@@ -4,28 +4,24 @@ from PIL import Image
 import numpy as np
 import os
 
-# إعداد واجهة المستخدم
-st.set_page_config(page_title="Skin Safety Expert", page_icon="🩺")
+# إعدادات الواجهة
+st.set_page_config(page_title="Skin Safety Expert", page_icon="🩺", layout="centered")
+
 st.title("🩺 Skin Disease Expert System")
-st.markdown("### **الدقة الإجمالية للنظام: 53.57%**")
+st.markdown(f"### **الدقة الإجمالية للنظام: 53.57%**") #
+st.write("---")
 
 @st.cache_resource
 def load_model():
-    model_path = "skin_expert_refined.tflite"
+    model_path = "skin_expert_refined.tflite" #
     if os.path.exists(model_path):
-        try:
-            # تحميل المفسر القياسي
-            interpreter = tf.lite.Interpreter(model_path=model_path)
-            interpreter.allocate_tensors()
-            return interpreter
-        except Exception as e:
-            st.error(f"خطأ في توافق العمليات: {e}")
-            return None
+        interpreter = tf.lite.Interpreter(model_path=model_path)
+        interpreter.allocate_tensors()
+        return interpreter
     return None
 
 interpreter = load_model()
 
-# قائمة الأمراض الـ 24
 labels = ['Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous Disease', 
           'Cellulitis Impetigo', 'Eczema', 'Exanthems and Drug Eruptions', 'Hair Loss Alopecia', 
           'Herpes HPV', 'Light Diseases', 'Lupus and Connective Tissue', 'Melanoma', 
@@ -35,32 +31,40 @@ labels = ['Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous
 
 malignant_types = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
 
-uploaded_file = st.file_uploader("ارفع صورة الجلد للفحص...", type=["jpg", "png"])
+uploaded_file = st.file_uploader("ارفع صورة الجلد لفحصها...", type=["jpg", "jpeg", "png"])
 
-if uploaded_file and interpreter:
+if uploaded_file is not None and interpreter is not None:
     image = Image.open(uploaded_file).convert('RGB')
-    st.image(image, use_container_width=True)
+    st.image(image, caption='الصورة المرفوعة', use_container_width=True)
     
     if st.button('بدء التشخيص التحليلي'):
         input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
+        # تصحيح الأبعاد ديناميكياً لمنع التشخيص الخاطئ
+        h, w = input_details[0]['shape'][1], input_details[0]['shape'][2]
         
-        img = image.resize((150, 150))
+        img = image.resize((w, h))
         img_array = np.array(img, dtype=np.float32)
-        img_array = (img_array / 127.5) - 1.0 # التطبيع
+        img_array = (img_array / 127.5) - 1.0 # التطبيع الصحيح
         img_array = np.expand_dims(img_array, axis=0)
         
         interpreter.set_tensor(input_details[0]['index'], img_array)
         interpreter.invoke()
-        output_data = interpreter.get_tensor(output_details[0]['index'])
+        output_data = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])
         
-        prediction_name = labels[np.argmax(output_data[0])]
+        result_idx = np.argmax(output_data[0])
+        prediction_name = labels[result_idx]
         
-        st.write("### 🔍 النتائج:")
+        st.write("### 🔍 النتيجة:")
         if prediction_name in malignant_types:
-            st.error(f"⚠️ التشخيص المتوقع: {prediction_name} (خبيث)")
+            st.error(f"⚠️ النوع المتوقع: {prediction_name} (خبيث)")
         else:
-            st.success(f"✅ التشخيص المتوقع: {prediction_name} (حميد)")
+            st.success(f"✅ النوع المتوقع: {prediction_name} (حميد)")
 
-st.warning("هذا النظام لأغراض تعليمية فقط.")
+# الملاحظة القانونية كما طلبت
+st.write("---")
+st.warning("""
+**⚠️ ملاحظة هامة جداً (إخلاء مسؤولية):**
+* هذا النظام يعتمد كلياً على تقنيات الذكاء الاصطناعي وتم تطويره لأغراض بحثية فقط.
+* هذا البرنامج **ليس تشخيصاً طبياً حقيقياً** ولا يغني عن مراجعة الطبيب.
+""")
 
