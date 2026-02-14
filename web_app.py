@@ -4,10 +4,9 @@ from PIL import Image
 import numpy as np
 import os
 
-# 1. إعدادات الواجهة
+# إعدادات الواجهة
 st.set_page_config(page_title="Skin Cancer Expert", page_icon="🩺")
-st.title("🩺 نظام الفحص الذكي للأورام الجلدية")
-st.write("---")
+st.title("🩺 نظام تشخيص سرطان الجلد")
 
 @st.cache_resource
 def load_model():
@@ -20,7 +19,7 @@ def load_model():
 
 interpreter = load_model()
 
-# الأصناف الـ 24 المعتمدة
+# قائمة الأصناف الـ 24 المعتمدة
 labels = [
     'Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous Disease', 
     'Cellulitis Impetigo', 'Eczema', 'Exanthems and Drug Eruptions', 'Hair Loss Alopecia', 
@@ -30,21 +29,21 @@ labels = [
     'Urticaria Hives', 'Vascular Tumors', 'Vasculitis', 'Warts and Molluscum'
 ]
 
-# تحديد أنواع السرطان (الأصناف الخبيثة) لزيادة حساسيتها
+# أنواع السرطان (الخبيثة)
 cancer_labels = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
 
 uploaded_file = st.file_uploader("ارفع صورة الفحص الجلدي...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file and interpreter:
     image = Image.open(uploaded_file).convert('RGB')
-    st.image(image, caption="الصورة تحت التحليل الرقمي", use_container_width=True)
+    st.image(image, caption="الصورة المرفوعة", use_container_width=True)
     
-    if st.button('بدء فحص مؤشرات الأورام الخبيثة'):
+    if st.button('إجراء التشخيص النهائي'):
         input_details = interpreter.get_input_details()
         h, w = input_details[0]['shape'][1], input_details[0]['shape'][2]
-        dtype = input_details[0]['dtype'] # للتعامل مع FLOAT16
+        dtype = input_details[0]['dtype'] 
         
-        # تحسين معالجة الصورة (LANCZOS) وتطبيع MobileNet
+        # معالجة الصورة
         img = image.resize((w, h), Image.Resampling.LANCZOS)
         img_array = np.array(img).astype(np.float32)
         img_array = (img_array / 127.5) - 1.0 
@@ -55,38 +54,24 @@ if uploaded_file and interpreter:
             interpreter.invoke()
             output_data = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])
             
-            probs = output_data[0]
+            # الحصول على التوقع الأعلى فقط (التشخيص الوحيد)
+            result_idx = np.argmax(output_data[0])
+            prediction = labels[result_idx]
             
-            # --- منطق الفحص ذو الأولوية (السرطان أولاً) ---
-            st.write("### 🔍 نتائج الفحص التحليلي:")
-            
-            # فحص إذا كان أي نوع من السرطان موجود في أعلى 5 احتمالات
-            top_5_indices = np.argsort(probs)[-5:][::-1]
-            cancer_detected_in_top = [i for i in top_5_indices if labels[i] in cancer_labels]
-            
-            # عرض كل الاحتمالات المهمة مع التمييز اللوني
-            for i in top_5_indices:
-                name = labels[i]
-                confidence = probs[i] * 100
-                if name in cancer_labels:
-                    st.warning(f"🚨 تنبيه مؤشر خبيث: {name} ({confidence:.2f}%)")
-                else:
-                    st.info(f"🔹 حالة حميدة: {name} ({confidence:.2f}%)")
-
             st.write("---")
-            
-            # التصنيف النهائي: إذا وجد سرطان بنسبة معقولة (حتى لو ليس الأول) يتم التحذير منه
-            # هنا نكسر "جمود" التصنيف الخاطئ
-            highest_cancer_idx = cancer_detected_in_top[0] if cancer_detected_in_top else None
-            
-            if highest_cancer_idx is not None and probs[highest_cancer_idx] > 0.05: # عتبة 5% لكشف السرطان المتربص
-                st.error(f"🔴 النتيجة النهائية: تم رصد مؤشرات لمرض {labels[highest_cancer_idx]} - [خبيث]")
+            st.write("### 🔍 النتيجة النهائية للتشخيص:")
+
+            # فحص نوع التشخيص (خبيث أم حميد) بدون عرض نسب
+            if prediction in cancer_labels:
+                st.error(f"⚠️ التشخيص المكتشف: {prediction}")
+                st.subheader("🔴 التصنيف: [خبيث - سرطان]")
             else:
-                final_name = labels[top_5_indices[0]]
-                st.success(f"🟢 النتيجة النهائية: {final_name} - [حميد]")
+                st.success(f"✅ التشخيص المكتشف: {prediction}")
+                st.subheader("🟢 التصنيف: [حميد - ليس سرطان]")
                 
         except Exception as e:
-            st.error(f"خطأ في قراءة البيانات الرقمية: {e}")
+            st.error(f"خطأ تقني: {e}")
 
+# الملاحظة القانونية المطلوبة
 st.write("---")
-st.warning("⚠️ ملاحظة: هذا النظام بحثي للكشف عن مؤشرات السرطان ولا يغني عن زيارة الطبيب.")
+st.warning("⚠️ ملاحظة إخلاء مسؤولية: هذا النظام يعتمد على الذكاء الاصطناعي للأغراض التعليمية فقط وليس تشخيصاً طبياً حقيقياً.")
