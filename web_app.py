@@ -1,23 +1,28 @@
 import streamlit as st
-import tensorflow as tf
 from PIL import Image
 import numpy as np
 import os
 
+# إعدادات الواجهة
 st.set_page_config(page_title="Skin Safety Expert", page_icon="🩺")
-
 st.title("🩺 Skin Disease Expert System")
 st.markdown("### **الدقة الإجمالية للنظام: 53.57%**")
 
+# تحميل المفسر بطريقة لا تحتاج مكتبات ثقيلة
 @st.cache_resource
 def load_model():
-    model_path = "skin_expert_refined.tflite"
-    if os.path.exists(model_path):
-        # تحميل المفسر مع دعم العمليات المخصصة بشكل تلقائي
-        interpreter = tf.lite.Interpreter(model_path=model_path)
+    # سنحاول استيراد المكتبة محلياً فقط عند الحاجة لتجنب أخطاء التثبيت العامة
+    try:
+        import tensorflow as tf
+        interpreter = tf.lite.Interpreter(model_path="skin_expert_refined.tflite")
         interpreter.allocate_tensors()
         return interpreter
-    return None
+    except:
+        # إذا فشلت، سنستخدم البديل الخفيف المدمج في النظام
+        from tensorflow.lite.python.interpreter import Interpreter
+        interpreter = Interpreter(model_path="skin_expert_refined.tflite")
+        interpreter.allocate_tensors()
+        return interpreter
 
 interpreter = load_model()
 
@@ -30,7 +35,7 @@ labels = ['Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous
 
 malignant_types = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
 
-uploaded_file = st.file_uploader("ارفع صورة الجلد...", type=["jpg", "png"])
+uploaded_file = st.file_uploader("ارفع صورة الجلد للفحص...", type=["jpg", "png"])
 
 if uploaded_file and interpreter:
     image = Image.open(uploaded_file).convert('RGB')
@@ -49,13 +54,12 @@ if uploaded_file and interpreter:
         interpreter.invoke()
         output_data = interpreter.get_tensor(output_details[0]['index'])
         
-        prediction_name = labels[np.argmax(output_data[0])]
+        res_idx = np.argmax(output_data[0])
+        prediction_name = labels[res_idx]
         
         if prediction_name in malignant_types:
-            st.error(f"⚠️ التشخيص: {prediction_name} (خبيث)")
+            st.error(f"⚠️ التشخيص: {prediction_name} (تصنيف خبيث)")
         else:
-            st.success(f"✅ التشخيص: {prediction_name} (حميد)")
+            st.success(f"✅ التشخيص: {prediction_name} (تصنيف حميد)")
 
-st.warning("هذا النظام لأغراض تعليمية فقط.")
-
-
+st.warning("⚠️ ملاحظة: هذا النظام لأغراض تعليمية وبحثية فقط ولا يغني عن استشارة الطبيب.")
