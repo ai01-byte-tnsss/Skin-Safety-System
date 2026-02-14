@@ -1,31 +1,31 @@
 import streamlit as st
+import tensorflow as tf
 from PIL import Image
 import numpy as np
 import os
 
-# إعدادات الواجهة
+# إعداد واجهة المستخدم
 st.set_page_config(page_title="Skin Safety Expert", page_icon="🩺")
 st.title("🩺 Skin Disease Expert System")
 st.markdown("### **الدقة الإجمالية للنظام: 53.57%**")
 
-# تحميل المفسر بطريقة لا تحتاج مكتبات ثقيلة
 @st.cache_resource
 def load_model():
-    # سنحاول استيراد المكتبة محلياً فقط عند الحاجة لتجنب أخطاء التثبيت العامة
-    try:
-        import tensorflow as tf
-        interpreter = tf.lite.Interpreter(model_path="skin_expert_refined.tflite")
-        interpreter.allocate_tensors()
-        return interpreter
-    except:
-        # إذا فشلت، سنستخدم البديل الخفيف المدمج في النظام
-        from tensorflow.lite.python.interpreter import Interpreter
-        interpreter = Interpreter(model_path="skin_expert_refined.tflite")
-        interpreter.allocate_tensors()
-        return interpreter
+    model_path = "skin_expert_refined.tflite"
+    if os.path.exists(model_path):
+        try:
+            # تحميل المفسر القياسي
+            interpreter = tf.lite.Interpreter(model_path=model_path)
+            interpreter.allocate_tensors()
+            return interpreter
+        except Exception as e:
+            st.error(f"خطأ في توافق العمليات: {e}")
+            return None
+    return None
 
 interpreter = load_model()
 
+# قائمة الأمراض الـ 24
 labels = ['Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous Disease', 
           'Cellulitis Impetigo', 'Eczema', 'Exanthems and Drug Eruptions', 'Hair Loss Alopecia', 
           'Herpes HPV', 'Light Diseases', 'Lupus and Connective Tissue', 'Melanoma', 
@@ -47,19 +47,20 @@ if uploaded_file and interpreter:
         
         img = image.resize((150, 150))
         img_array = np.array(img, dtype=np.float32)
-        img_array = (img_array / 127.5) - 1.0
+        img_array = (img_array / 127.5) - 1.0 # التطبيع
         img_array = np.expand_dims(img_array, axis=0)
         
         interpreter.set_tensor(input_details[0]['index'], img_array)
         interpreter.invoke()
         output_data = interpreter.get_tensor(output_details[0]['index'])
         
-        res_idx = np.argmax(output_data[0])
-        prediction_name = labels[res_idx]
+        prediction_name = labels[np.argmax(output_data[0])]
         
+        st.write("### 🔍 النتائج:")
         if prediction_name in malignant_types:
-            st.error(f"⚠️ التشخيص: {prediction_name} (تصنيف خبيث)")
+            st.error(f"⚠️ التشخيص المتوقع: {prediction_name} (خبيث)")
         else:
-            st.success(f"✅ التشخيص: {prediction_name} (تصنيف حميد)")
+            st.success(f"✅ التشخيص المتوقع: {prediction_name} (حميد)")
 
-st.warning("⚠️ ملاحظة: هذا النظام لأغراض تعليمية وبحثية فقط ولا يغني عن استشارة الطبيب.")
+st.warning("هذا النظام لأغراض تعليمية فقط.")
+
