@@ -4,13 +4,13 @@ from PIL import Image
 import numpy as np
 import os
 
-# إعدادات الواجهة
+# 1. إعدادات الواجهة
 st.set_page_config(page_title="Skin Safety Expert", page_icon="🩺", layout="centered")
 st.title("🩺 Skin Disease Expert System")
-st.markdown(f"### **الدقة الإجمالية للنظام: 53.57%**") #
+st.markdown(f"### **الدقة الإجمالية للنظام: 53.57%**")
 st.write("---")
 
-# تحميل النموذج
+# 2. تحميل النموذج
 @st.cache_resource
 def load_model():
     model_path = "skin_expert_refined.tflite"
@@ -31,6 +31,7 @@ labels = ['Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous
 
 malignant_types = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
 
+# 3. واجهة رفع الصور
 uploaded_file = st.file_uploader("ارفع صورة الجلد لفحصها...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None and interpreter is not None:
@@ -38,33 +39,29 @@ if uploaded_file is not None and interpreter is not None:
     st.image(image, caption='الصورة المرفوعة', use_container_width=True)
     
     if st.button('بدء التشخيص التحليلي'):
-        # --- معالجة المصفوفة العامة لتجنب خطأ السطر 67 ---
         input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
         
-        # قراءة الأبعاد المطلوبة ديناميكياً من النموذج
+        # قراءة الأبعاد والأنواع المطلوبة من النموذج
         target_height = input_details[0]['shape'][1]
         target_width = input_details[0]['shape'][2]
+        # تحديد نوع البيانات المطلوب (FLOAT16 أو FLOAT32) بشكل ديناميكي
+        required_dtype = input_details[0]['dtype']
         
-        # 1. تغيير حجم الصورة لتطابق مصفوفة النموذج
+        # معالجة الصورة
         img = image.resize((target_width, target_height))
         
-        # 2. تحويل الصورة إلى مصفوفة Numpy مع التأكد من نوع float32 (أساسي لحل الخطأ)
-        img_array = np.array(img, dtype=np.float32)
+        # --- الحل النهائي للخطأ: تحويل المصفوفة للنوع المطلوب من النموذج حصراً ---
+        img_array = np.array(img, dtype=required_dtype) 
         
-        # 3. التطبيع (Normalization) لمجال [-1, 1]
+        # التطبيع
         img_array = (img_array / 127.5) - 1.0 
-        
-        # 4. إضافة بعد الدفعة لتصبح المصفوفة رباعية الأبعاد [1, H, W, 3]
-        img_array = np.expand_dims(img_array, axis=0)
+        img_array = np.expand_dims(img_array, axis=0).astype(required_dtype)
         
         try:
-            # السطر 67: تغذية النموذج بالمصفوفة
             interpreter.set_tensor(input_details[0]['index'], img_array)
             interpreter.invoke()
-            output_data = interpreter.get_tensor(output_details[0]['index'])
+            output_data = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])
             
-            # استخراج النتيجة
             result_idx = np.argmax(output_data[0])
             prediction_name = labels[result_idx]
             
@@ -74,12 +71,8 @@ if uploaded_file is not None and interpreter is not None:
             else:
                 st.success("التصنيف الطبي: حميد")
         except Exception as e:
-            # عرض الخطأ بشكل مفصل في حال حدوثه
             st.error(f"حدث خطأ تقني في مصفوفة البيانات: {e}")
 
-# الملاحظة الطبية كما في المشروع القديم
+# 4. ملاحظة إخلاء المسؤولية
 st.write("---")
-st.warning("""
-**⚠️ ملاحظة إخلاء مسؤولية:**
-هذا النظام يعتمد على الذكاء الاصطناعي للأغراض التعليمية فقط، وليس تشخيصاً طبياً حقيقياً.
-""")
+st.warning("⚠️ ملاحظة إخلاء مسؤولية: هذا النظام يعتمد على الذكاء الاصطناعي للأغراض التعليمية فقط وليس تشخيصاً طبياً حقيقياً.")
