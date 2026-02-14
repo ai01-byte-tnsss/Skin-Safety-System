@@ -4,9 +4,8 @@ from PIL import Image
 import numpy as np
 import os
 
-# إعدادات الواجهة
 st.set_page_config(page_title="Skin Cancer Expert", page_icon="🩺")
-st.title("🩺 نظام تشخيص سرطان الجلد")
+st.title("🩺 نظام فحص وتشخيص سرطان الجلد")
 
 @st.cache_resource
 def load_model():
@@ -19,7 +18,7 @@ def load_model():
 
 interpreter = load_model()
 
-# قائمة الأصناف الـ 24 المعتمدة
+# قائمة الأصناف
 labels = [
     'Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous Disease', 
     'Cellulitis Impetigo', 'Eczema', 'Exanthems and Drug Eruptions', 'Hair Loss Alopecia', 
@@ -29,7 +28,7 @@ labels = [
     'Urticaria Hives', 'Vascular Tumors', 'Vasculitis', 'Warts and Molluscum'
 ]
 
-# أنواع السرطان (الخبيثة)
+# الأصناف الخبيثة (سرطان)
 cancer_labels = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
 
 uploaded_file = st.file_uploader("ارفع صورة الفحص الجلدي...", type=["jpg", "png", "jpeg"])
@@ -43,10 +42,14 @@ if uploaded_file and interpreter:
         h, w = input_details[0]['shape'][1], input_details[0]['shape'][2]
         dtype = input_details[0]['dtype'] 
         
-        # معالجة الصورة
+        # --- التعديل الجوهري لكسر جمود التشخيص ---
         img = image.resize((w, h), Image.Resampling.LANCZOS)
         img_array = np.array(img).astype(np.float32)
-        img_array = (img_array / 127.5) - 1.0 
+        
+        # تغيير معادلة التطبيع لفك الارتباط بـ Warts
+        # تجربة التطبيع من 0 إلى 1 (غالبية نماذج الكولاب تعمل هكذا)
+        img_array = img_array / 255.0 
+        
         img_array = np.expand_dims(img_array, axis=0).astype(dtype)
         
         try:
@@ -54,16 +57,22 @@ if uploaded_file and interpreter:
             interpreter.invoke()
             output_data = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])
             
-            # الحصول على التوقع الأعلى فقط (التشخيص الوحيد)
-            result_idx = np.argmax(output_data[0])
-            prediction = labels[result_idx]
+            probs = output_data[0]
+            
+            # البحث عن أعلى نسبة لسرطان موجودة في النتائج حتى لو لم تكن الأولى
+            cancer_indices = [labels.index(c) for c in cancer_labels]
+            cancer_probs = {labels[i]: probs[i] for i in cancer_indices}
+            highest_cancer = max(cancer_probs, key=cancer_probs.get)
+            
+            # الحصول على التوقع العام الأعلى
+            top_idx = np.argmax(probs)
+            prediction = labels[top_idx]
             
             st.write("---")
-            st.write("### 🔍 النتيجة النهائية للتشخيص:")
-
-            # فحص نوع التشخيص (خبيث أم حميد) بدون عرض نسب
-            if prediction in cancer_labels:
-                st.error(f"⚠️ التشخيص المكتشف: {prediction}")
+            
+            # منطق الأولوية للسرطان: إذا كانت نسبة السرطان > 1% اعتبره خبيثاً للأمان
+            if cancer_probs[highest_cancer] > 0.01: 
+                st.error(f"⚠️ التشخيص المكتشف: {highest_cancer}")
                 st.subheader("🔴 التصنيف: [خبيث - سرطان]")
             else:
                 st.success(f"✅ التشخيص المكتشف: {prediction}")
@@ -72,6 +81,5 @@ if uploaded_file and interpreter:
         except Exception as e:
             st.error(f"خطأ تقني: {e}")
 
-# الملاحظة القانونية المطلوبة
 st.write("---")
-st.warning("⚠️ ملاحظة إخلاء مسؤولية: هذا النظام يعتمد على الذكاء الاصطناعي للأغراض التعليمية فقط وليس تشخيصاً طبياً حقيقياً.")
+st.warning("⚠️ ملاحظة إخلاء مسؤولية: هذا النظام تعليمي ولا يغني عن التشخيص الطبي.")
