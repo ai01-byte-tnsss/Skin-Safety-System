@@ -1,6 +1,6 @@
 streamlit
-tensorflow
-Pillow
+tensorflow-cpu
+pillow
 numpy
 
 
