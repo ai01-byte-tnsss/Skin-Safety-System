@@ -14,7 +14,7 @@ st.write("---")
 # 2. تحميل النموذج
 @st.cache_resource
 def load_model():
-    model_path = "skin_expert_refined.tflite" #
+    model_path = "skin_expert_refined.tflite"
     if os.path.exists(model_path):
         interpreter = tf.lite.Interpreter(model_path=model_path)
         interpreter.allocate_tensors()
@@ -23,7 +23,7 @@ def load_model():
 
 interpreter = load_model()
 
-# قائمة الأصناف الـ 24 المعتمدة
+# قائمة الأصناف الـ 24
 labels = ['Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous Disease', 
           'Cellulitis Impetigo', 'Eczema', 'Exanthems and Drug Eruptions', 'Hair Loss Alopecia', 
           'Herpes HPV', 'Light Diseases', 'Lupus and Connective Tissue', 'Melanoma', 
@@ -41,46 +41,46 @@ if uploaded_file is not None and interpreter is not None:
     st.image(image, caption='الصورة المرفوعة', use_container_width=True)
     
     if st.button('بدء التشخيص التحليلي'):
-        # --- الجزء الخاص بتعديل حجم المصفوفة بشكل عام ---
-        # الحصول على تفاصيل المدخلات من النموذج مباشرة
+        # --- حل مشكلة السطر 67 (المصفوفة العامة) ---
         input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
         
-        # استخراج الأبعاد المطلوبة ديناميكياً من النموذج
-        # المصفوفة عادة تكون بتنسيق [Batch, Height, Width, Channels]
-        target_height = input_details[0]['shape'][1]
-        target_width = input_details[0]['shape'][2]
+        # قراءة الأبعاد المطلوبة من النموذج نفسه
+        new_height = input_details[0]['shape'][1]
+        new_width = input_details[0]['shape'][2]
         
-        # تعديل حجم الصورة المرفوعة لتطابق أبعاد مصفوفة النموذج
-        img = image.resize((target_width, target_height))
-        
-        # تحويل الصورة إلى مصفوفة Numpy مع تحديد نوع البيانات float32
+        # تغيير حجم الصورة وتحويلها لمصفوفة float32 حصراً
+        img = image.resize((new_width, new_height))
         img_array = np.array(img, dtype=np.float32)
         
-        # تطبيق عملية التطبيع (Normalization) لتناسب لغة النموذج
+        # التطبيع (Normalization)
         img_array = (img_array / 127.5) - 1.0 
         
-        # إضافة بعد الدفعة (Expand Dimensions) لتصبح المصفوفة رباعية الأبعاد [1, H, W, 3]
+        # إضافة بعد الدفعة لتصبح المصفوفة [1, Height, Width, 3]
         img_array = np.expand_dims(img_array, axis=0)
-        # ------------------------------------------------
         
-        # تنفيذ التنبؤ
-        interpreter.set_tensor(input_details[0]['index'], img_array)
-        interpreter.invoke()
-        output_data = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])
-        
-        # عرض النتيجة
-        result_idx = np.argmax(output_data[0])
-        prediction_name = labels[result_idx]
-        
-        st.write("### 🔍 نتيجة التحليل:")
-        if prediction_name in malignant_types:
-            st.error(f"⚠️ النوع: {prediction_name} (خبيث)")
-        else:
-            st.success(f"✅ النوع: {prediction_name} (حميد)")
+        try:
+            # السطر 67: إرسال المصفوفة للنموذج
+            interpreter.set_tensor(input_details[0]['index'], img_array)
+            interpreter.invoke()
+            output_data = interpreter.get_tensor(output_details[0]['index'])
+            
+            # عرض النتيجة
+            result_idx = np.argmax(output_data[0])
+            prediction_name = labels[result_idx]
+            
+            st.write(f"### 🔍 التشخيص: {prediction_name}")
+            if prediction_name in malignant_types:
+                st.error("التصنيف: خبيث (يستوجب فحص طبي)")
+            else:
+                st.success("التصنيف: حميد")
+        except Exception as e:
+            st.error(f"خطأ في معالجة المصفوفة: {e}")
 
-# 4. الملاحظة القانونية
+# 4. الملاحظة الطبية
 st.write("---")
 st.warning("""
 **⚠️ ملاحظة إخلاء مسؤولية:**
-هذا النظام يعتمد على الذكاء الاصطناعي للأغراض التعليمية والبحثية فقط، ولا يعتبر تشخيصاً طبياً نهائياً.
+هذا النظام يعتمد على الذكاء الاصطناعي للأغراض البحثية فقط، وليس تشخيصاً طبياً حقيقياً.
 """)
+
