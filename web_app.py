@@ -20,7 +20,7 @@ def load_model():
 
 interpreter = load_model()
 
-# قائمة الأصناف التقنية للتعرف الداخلي
+# القائمة الداخلية للأمراض
 labels = [
     'Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous Disease', 
     'Cellulitis Impetigo', 'Eczema', 'Exanthems and Drug Eruptions', 'Hair Loss Alopecia', 
@@ -30,31 +30,32 @@ labels = [
     'Urticaria Hives', 'Vascular Tumors', 'Vasculitis', 'Warts and Molluscum'
 ]
 
-# تحديد الأصناف الخبيثة
-cancer_labels = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
+# تحديد الأصناف الخبيثة بدقة
+cancer_indices = [labels.index('Melanoma'), labels.index('Actinic Keratosis'), labels.index('Vascular Tumors')]
 
-# 2. منطقة إدراج الصورة
 uploaded_file = st.file_uploader("قم بإدراج الصورة للاختبار...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file and interpreter:
     image = Image.open(uploaded_file).convert('RGB')
     
-    # معالجة قوية لإزالة الضوضاء
+    # تحسين المعالجة لتقليل الخطأ في الصور المتشابهة
+    image = ImageOps.exif_transpose(image) # تصحيح دوران الصورة تلقائياً
     image = ImageOps.autocontrast(image) 
-    processed_img = image.filter(ImageFilter.SMOOTH_MORE)
-    st.image(processed_img, caption="الصورة تحت المعالجة الآن", use_container_width=True)
+    processed_img = image.filter(ImageFilter.DETAIL) # إبراز تفاصيل الورم للـ CNN
+    
+    st.image(processed_img, caption="الصورة قيد التحليل الرقمي", use_container_width=True)
     
     if st.button('اختبار: سرطان أم لا؟'):
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
         h, w = input_details[0]['shape'][1], input_details[0]['shape'][2]
         
-        # تحضير الصورة لنموذج CNN
-        img_resized = processed_img.resize((w, h), Image.Resampling.BILINEAR)
+        # تحضير الصورة
+        img_resized = processed_img.resize((w, h), Image.Resampling.LANCZOS)
         img_array = np.array(img_resized).astype(np.float32)
         img_array = (img_array / 127.5) - 1.0 
         
-        # تصحيح النوع ليتوافق مع FLOAT16 أو INT8
+        # حل مشكلة FLOAT16 والـ Quantization
         input_type = input_details[0]['dtype']
         img_final = np.expand_dims(img_array, axis=0).astype(input_type)
         
@@ -63,31 +64,33 @@ if uploaded_file and interpreter:
             interpreter.invoke()
             output_data = interpreter.get_tensor(output_details[0]['index'])
             
-            # معالجة قيم التكميم (Scaling)
+            # إعادة تحجيم المخرجات (De-quantization)
             if output_details[0]['dtype'] == np.int8 or output_details[0]['dtype'] == np.uint8:
                 scale, zero_point = output_details[0]['quantization']
                 probs = (output_data[0].astype(np.float32) - zero_point) * scale
             else:
                 probs = output_data[0]
             
-            # منع تداخل الأصناف التي تسبب خطأ في التصنيف
+            # --- حل مشكلة التذبذب (The Precision Fix) ---
+            # حساب مجموع احتمالات السرطان (الخبيث) مقابل الحميد
+            cancer_score = sum([probs[i] for i in cancer_indices])
+            
+            # استبعاد الصنف الذي يسبب أخطاء دائمة (Warts)
             warts_idx = labels.index('Warts and Molluscum')
             probs[warts_idx] = -1.0 
             
-            top_idx = np.argmax(probs)
-            prediction = labels[top_idx]
+            top_prediction_is_cancer = np.argmax(probs) in cancer_indices
             
             st.write("---")
-            # النتيجة النهائية حسب المخطط: خبيث أم حميد فقط
-            if prediction in cancer_labels:
+            # منطق الورقة: إذا كان مجموع مؤشرات السرطان عالٍ، فهو خبيث
+            if top_prediction_is_cancer or cancer_score > 0.15: 
                 st.error("🚨 نتيجة الفحص: (خبيث)")
             else:
                 st.success("✅ نتيجة الفحص: (حميد)")
                 
         except Exception as e:
-            st.error(f"حدث خطأ فني: {e}")
+            st.error(f"حدث خطأ في دوال التصنيف: {e}")
 
-# السطر الأخير المحدث حسب بيانات الورقة
+# السطر الأخير حسب متطلبات الورقة
 st.write("---")
 st.info("نظام خبير مدرب بخوارزمية CNN - دقة 91% (80% تدريب / 20% اختبار)")
-
