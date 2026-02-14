@@ -1,3 +1,4 @@
 streamlit
 tflite-runtime
 Pillow
+numpy
