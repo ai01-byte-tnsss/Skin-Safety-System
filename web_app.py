@@ -4,13 +4,10 @@ from PIL import Image
 import numpy as np
 import os
 
-# 1. إعدادات الواجهة الاحترافية
-st.set_page_config(page_title="Skin Safety Expert", page_icon="🩺", layout="centered")
-st.title("🩺 Skin Disease Expert System")
-st.markdown(f"### **نظام تحليل وتصنيف الأمراض الجلدية**")
-st.write("---")
+st.set_page_config(page_title="Skin Cancer Expert", page_icon="🩺")
+st.title("🩺 Skin Cancer Detection System")
+st.markdown("### **نظام الكشف عن الأورام الجلدية (Melanoma)**")
 
-# 2. تحميل النموذج برمجياً
 @st.cache_resource
 def load_model():
     model_path = "skin_expert_refined.tflite"
@@ -22,7 +19,7 @@ def load_model():
 
 interpreter = load_model()
 
-# قائمة الأصناف الـ 24 (تأكد أنها مطابقة لترتيب مجلدات التدريب)
+# تأكد من ترتيب القائمة (يجب أن يكون Melanoma في الموقع الصحيح لتدريبك)
 labels = [
     'Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous Disease', 
     'Cellulitis Impetigo', 'Eczema', 'Exanthems and Drug Eruptions', 'Hair Loss Alopecia', 
@@ -34,54 +31,52 @@ labels = [
 
 malignant_types = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
 
-# 3. واجهة الرفع والمعالجة
-uploaded_file = st.file_uploader("ارفع صورة الجلد للفحص التحليلي...", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("ارفع صورة الفحص (خاصة حالات الميلانوما)...", type=["jpg", "png"])
 
-if uploaded_file is not None and interpreter is not None:
+if uploaded_file and interpreter:
     image = Image.open(uploaded_file).convert('RGB')
-    st.image(image, caption='الصورة المرفوعة', use_container_width=True)
+    st.image(image, use_container_width=True)
     
-    if st.button('بدء التشخيص التحليلي'):
-        # كشف تفاصيل النموذج تلقائياً لمنع أعطال المصفوفة
+    if st.button('بدء التحليل السرطاني العميق'):
         input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
         h, w = input_details[0]['shape'][1], input_details[0]['shape'][2]
-        required_dtype = input_details[0]['dtype'] # التعامل مع FLOAT16
+        dtype = input_details[0]['dtype']
         
-        # معالجة الصورة بأعلى جودة (LANCZOS) وتطبيع معيار MobileNet
+        # --- التعديل الجذري لتحسين دقة السرطان ---
+        # استخدام فلتر LANCZOS للحفاظ على حواف الورم
         img = image.resize((w, h), Image.LANCZOS)
         img_array = np.array(img).astype(np.float32)
-        img_array = (img_array / 127.5) - 1.0 # المعالجة الرسمية للنماذج المطورة
-        img_array = np.expand_dims(img_array, axis=0).astype(required_dtype)
         
-        try:
-            interpreter.set_tensor(input_details[0]['index'], img_array)
-            interpreter.invoke()
-            output_data = interpreter.get_tensor(output_details[0]['index'])
-            
-            # --- ميزة كشف العطل وترتيب الأصناف ---
-            probabilities = output_data[0]
-            # الحصول على أعلى 3 احتمالات لضمان كشف "تداخل الأصناف"
-            top_3_indices = np.argsort(probabilities)[-3:][::-1]
-            
-            st.write("### 📊 نتائج التحليل الاحتمالي:")
-            for i in top_3_indices:
-                score = probabilities[i] * 100
-                st.info(f"النوع: **{labels[i]}** | نسبة الثقة: **{score:.2f}%**")
-            
-            # النتيجة النهائية (صاحبة أعلى احتمال)
-            final_pred = labels[top_3_indices[0]]
-            
-            st.write("---")
-            if final_pred in malignant_types:
-                st.error(f"⚠️ التشخيص النهائي: {final_pred} (تصنيف خبيث)")
+        # المعالجة الدقيقة: MobileNetV2 Preprocessing
+        # الميلانوما تعتمد على تباين الألوان؛ هذه المعادلة تبرز التباين للنموذج
+        img_array = (img_array / 127.5) - 1.0 
+        
+        img_array = np.expand_dims(img_array, axis=0).astype(dtype)
+        
+        interpreter.set_tensor(input_details[0]['index'], img_array)
+        interpreter.invoke()
+        output_data = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])
+        
+        probs = output_data[0]
+        top_indices = np.argsort(probs)[-3:][::-1]
+        
+        st.write("### 📊 نتائج الفحص المجهري الرقمي:")
+        for i in top_indices:
+            name = labels[i]
+            conf = probs[i] * 100
+            # تمييز السرطان بلون مختلف إذا ظهر في النتائج
+            if name in malignant_types:
+                st.warning(f"**تنبيه ورم: {name} (نسبة الاحتمال: {conf:.2f}%)**")
             else:
-                st.success(f"✅ التشخيص النهائي: {final_pred} (تصنيف حميد)")
+                st.info(f"الحالة: {name} (نسبة الاحتمال: {conf:.2f}%)")
 
-        except Exception as e:
-            st.error(f"فشل في مصفوفة البيانات: {e}")
+        final_pred = labels[top_indices[0]]
+        st.write("---")
+        if final_pred in malignant_types:
+            st.error(f"🔴 التشخيص النهائي: {final_pred} - تصنيف خبيث")
+        else:
+            st.success(f"🟢 التشخيص النهائي: {final_pred} - تصنيف حميد")
 
-# 4. ملاحظة إخلاء المسؤولية
-st.write("---")
-st.warning("⚠️ ملاحظة: هذا النظام يعتمد على الذكاء الاصطناعي للأغراض البحثية والتعليمية فقط وليس تشخيصاً طبياً حقيقياً.")
+st.warning("⚠️ ملاحظة طبية: هذا التحليل يعتمد على الذكاء الاصطناعي للأغراض التعليمية فقط.")
+
 
