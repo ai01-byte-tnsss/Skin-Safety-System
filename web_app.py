@@ -4,13 +4,14 @@ from PIL import Image
 import numpy as np
 import os
 
-# إعدادات الواجهة
+# 1. إعدادات الواجهة
 st.set_page_config(page_title="Skin Safety Expert", page_icon="🩺", layout="centered")
 
 st.title("🩺 Skin Disease Expert System")
 st.markdown(f"### **الدقة الإجمالية للنظام: 53.57%**") #
 st.write("---")
 
+# 2. تحميل النموذج
 @st.cache_resource
 def load_model():
     model_path = "skin_expert_refined.tflite" #
@@ -22,6 +23,7 @@ def load_model():
 
 interpreter = load_model()
 
+# قائمة الأصناف الـ 24 المعتمدة
 labels = ['Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous Disease', 
           'Cellulitis Impetigo', 'Eczema', 'Exanthems and Drug Eruptions', 'Hair Loss Alopecia', 
           'Herpes HPV', 'Light Diseases', 'Lupus and Connective Tissue', 'Melanoma', 
@@ -31,6 +33,7 @@ labels = ['Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous
 
 malignant_types = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
 
+# 3. واجهة رفع الصور
 uploaded_file = st.file_uploader("ارفع صورة الجلد لفحصها...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None and interpreter is not None:
@@ -38,33 +41,46 @@ if uploaded_file is not None and interpreter is not None:
     st.image(image, caption='الصورة المرفوعة', use_container_width=True)
     
     if st.button('بدء التشخيص التحليلي'):
+        # --- الجزء الخاص بتعديل حجم المصفوفة بشكل عام ---
+        # الحصول على تفاصيل المدخلات من النموذج مباشرة
         input_details = interpreter.get_input_details()
-        # تصحيح الأبعاد ديناميكياً لمنع التشخيص الخاطئ
-        h, w = input_details[0]['shape'][1], input_details[0]['shape'][2]
         
-        img = image.resize((w, h))
+        # استخراج الأبعاد المطلوبة ديناميكياً من النموذج
+        # المصفوفة عادة تكون بتنسيق [Batch, Height, Width, Channels]
+        target_height = input_details[0]['shape'][1]
+        target_width = input_details[0]['shape'][2]
+        
+        # تعديل حجم الصورة المرفوعة لتطابق أبعاد مصفوفة النموذج
+        img = image.resize((target_width, target_height))
+        
+        # تحويل الصورة إلى مصفوفة Numpy مع تحديد نوع البيانات float32
         img_array = np.array(img, dtype=np.float32)
-        img_array = (img_array / 127.5) - 1.0 # التطبيع الصحيح
-        img_array = np.expand_dims(img_array, axis=0)
         
+        # تطبيق عملية التطبيع (Normalization) لتناسب لغة النموذج
+        img_array = (img_array / 127.5) - 1.0 
+        
+        # إضافة بعد الدفعة (Expand Dimensions) لتصبح المصفوفة رباعية الأبعاد [1, H, W, 3]
+        img_array = np.expand_dims(img_array, axis=0)
+        # ------------------------------------------------
+        
+        # تنفيذ التنبؤ
         interpreter.set_tensor(input_details[0]['index'], img_array)
         interpreter.invoke()
         output_data = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])
         
+        # عرض النتيجة
         result_idx = np.argmax(output_data[0])
         prediction_name = labels[result_idx]
         
-        st.write("### 🔍 النتيجة:")
+        st.write("### 🔍 نتيجة التحليل:")
         if prediction_name in malignant_types:
-            st.error(f"⚠️ النوع المتوقع: {prediction_name} (خبيث)")
+            st.error(f"⚠️ النوع: {prediction_name} (خبيث)")
         else:
-            st.success(f"✅ النوع المتوقع: {prediction_name} (حميد)")
+            st.success(f"✅ النوع: {prediction_name} (حميد)")
 
-# الملاحظة القانونية كما طلبت
+# 4. الملاحظة القانونية
 st.write("---")
 st.warning("""
-**⚠️ ملاحظة هامة جداً (إخلاء مسؤولية):**
-* هذا النظام يعتمد كلياً على تقنيات الذكاء الاصطناعي وتم تطويره لأغراض بحثية فقط.
-* هذا البرنامج **ليس تشخيصاً طبياً حقيقياً** ولا يغني عن مراجعة الطبيب.
+**⚠️ ملاحظة إخلاء مسؤولية:**
+هذا النظام يعتمد على الذكاء الاصطناعي للأغراض التعليمية والبحثية فقط، ولا يعتبر تشخيصاً طبياً نهائياً.
 """)
-
