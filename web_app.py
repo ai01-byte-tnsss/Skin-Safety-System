@@ -2,34 +2,25 @@ import streamlit as st
 import tensorflow as tf
 from PIL import Image
 import numpy as np
-import os
 
 # 1. إعدادات الصفحة
-st.set_page_config(page_title="Skin Expert System", page_icon="🩺", layout="centered")
-
+st.set_page_config(page_title="Skin Safety System", page_icon="🩺")
 st.title("🩺 Skin Disease Expert System")
-st.subheader("نظام خبير لتشخيص الأمراض الجلدية")
 st.write("---")
 
-# 2. تحميل النموذج مع معالجة الخطأ المعماري
+# 2. تحميل نموذج TFLite (أكثر استقراراً على Streamlit)
 @st.cache_resource
-def load_my_model():
-    model_path = 'skin_expert_master.h5'
-    if os.path.exists(model_path):
-        try:
-            # استخدام compile=False لحل مشكلة Layer dense_1 expects 1 input
-            model = tf.keras.models.load_model(model_path, compile=False)
-            return model
-        except Exception as e:
-            st.error(f"Error loading model: {e}")
-            return None
-    else:
-        st.error("❌ Model file not found in repository!")
-        return None
+def load_tflite_model():
+    # تأكد أن هذا الملف موجود في المستودع بنفس الاسم
+    interpreter = tf.lite.Interpreter(model_path="skin_expert_lite.tflite")
+    interpreter.allocate_tensors()
+    return interpreter
 
-model = load_my_model()
+interpreter = load_tflite_model()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
-# 3. قائمة الأصناف (مرتبة أبجدياً)
+# 3. قائمة الأمراض (24 صنفاً)
 labels = [
     'Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 
     'Bullous Disease', 'Cellulitis Impetigo', 'Eczema', 
@@ -41,30 +32,27 @@ labels = [
     'Vascular Tumors', 'Vasculitis', 'Warts and Molluscum'
 ]
 
-# 4. واجهة رفع الصور
-uploaded_file = st.file_uploader("Upload Skin Image / ارفع صورة الجلد", type=["jpg", "png", "jpeg"])
+# 4. واجهة التطبيق
+uploaded_file = st.file_uploader("ارفع صورة الجلد...", type=["jpg", "jpeg", "png"])
 
-if uploaded_file is not None and model is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption='Uploaded Image', use_container_width=True)
+if uploaded_file is not None:
+    image = Image.open(uploaded_file).convert('RGB')
+    st.image(image, caption='الصورة المختارة', use_container_width=True)
     
-    if st.button('Start Diagnosis / بدء التشخيص'):
-        with st.spinner('Analyzing...'):
-            # معالجة الصورة
-            img = image.resize((224, 224))
-            img_array = np.array(img.convert('RGB')) / 255.0
-            img_array = np.expand_dims(img_array, axis=0)
-            
-            # التوقع
-            predictions = model.predict(img_array)
-            result_idx = np.argmax(predictions)
-            confidence = np.max(predictions) * 100
-            
-            # عرض النتائج
-            st.write("---")
-            st.success(f"### Prediction: {labels[result_idx]}")
-            st.info(f"### Confidence: {confidence:.2f}%")
-            st.warning("⚠️ This is an AI tool. Consult a doctor for medical advice.")
-
-st.write("---")
-st.caption("Graduation Project - Skin Safety System 2026")
+    if st.button('بدء التشخيص'):
+        # معالجة الصورة لتناسب TFLite
+        img = image.resize((224, 224))
+        img_array = np.array(img, dtype=np.float32) / 255.0
+        img_array = np.expand_dims(img_array, axis=0)
+        
+        # تنفيذ التوقع
+        interpreter.set_tensor(input_details[0]['index'], img_array)
+        interpreter.invoke()
+        output_data = interpreter.get_tensor(output_details[0]['index'])
+        
+        result_idx = np.argmax(output_data)
+        confidence = np.max(output_data) * 100
+        
+        # عرض النتيجة
+        st.success(f"التشخيص المتوقع: {labels[result_idx]}")
+        st.info(f"نسبة التأكد: {confidence:.2f}%")
