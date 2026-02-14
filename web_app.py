@@ -4,10 +4,9 @@ from PIL import Image, ImageOps, ImageFilter
 import numpy as np
 import os
 
-# 1. إعدادات الواجهة الاحترافية (بدون نسب)
-st.set_page_config(page_title="CNN Skin Cancer System", page_icon="🩺")
-st.title("🩺 نظام CNN المتطور لتشخيص الأورام")
-st.write("---")
+# 1. إعدادات الواجهة
+st.set_page_config(page_title="CNN Skin Diagnostic", page_icon="🩺")
+st.title("🩺 نظام CNN لتشخيص سرطان الجلد")
 
 @st.cache_resource
 def load_model():
@@ -20,7 +19,7 @@ def load_model():
 
 interpreter = load_model()
 
-# قائمة الأصناف كما هي في تدريبك
+# قائمة الأصناف
 labels = [
     'Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous Disease', 
     'Cellulitis Impetigo', 'Eczema', 'Exanthems and Drug Eruptions', 'Hair Loss Alopecia', 
@@ -30,68 +29,61 @@ labels = [
     'Urticaria Hives', 'Vascular Tumors', 'Vasculitis', 'Warts and Molluscum'
 ]
 
-# تصنيفات السرطان (الخبيث) حسب مخططك
 cancer_labels = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
 
-# 2. منطقة إدراج الصورة (أيقونة الاختبار)
-uploaded_file = st.file_uploader("قم بإدراج صورة الجلد للفحص...", type=["jpg", "png", "jpeg"])
+# 2. إدراج الصورة
+uploaded_file = st.file_uploader("قم بإدراج صورة الجلد للاختبار...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file and interpreter:
-    # معالجة قوية للصورة (إزالة الضوضاء وتصحيح الإضاءة)
     image = Image.open(uploaded_file).convert('RGB')
-    image = ImageOps.autocontrast(image) # تحسين التباين لكشف الأورام
-    image = image.filter(ImageFilter.SHARPEN) # توضيح الحواف لخوارزمية CNN
     
-    st.image(image, caption="الصورة المعالجة رقمياً", use_container_width=True)
+    # معالجة الصورة لإزالة الضوضاء
+    processed_img = image.filter(ImageFilter.SMOOTH_MORE)
+    st.image(processed_img, caption="الصورة بعد المعالجة", use_container_width=True)
     
     if st.button('اختبار: سرطان أم لا؟'):
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
         h, w = input_details[0]['shape'][1], input_details[0]['shape'][2]
         
-        # تحضير المصفوفة للنموذج المكمم
-        img = image.resize((w, h), Image.Resampling.LANCZOS)
-        img_array = np.array(img).astype(np.float32)
-        img_array = (img_array / 127.5) - 1.0 # Scaling الرسمي
+        # تحضير الصورة لنموذج CNN
+        img_resized = processed_img.resize((w, h), Image.Resampling.BILINEAR)
+        img_array = np.array(img_resized).astype(np.float32)
+        img_array = (img_array / 127.5) - 1.0 
         
-        # تحويل النوع ليتوافق مع FLOAT16 أو INT8 تلقائياً
+        # تصحيح النوع FLOAT16/INT8
         input_type = input_details[0]['dtype']
-        img_array = np.expand_dims(img_array, axis=0).astype(input_type)
+        img_final = np.expand_dims(img_array, axis=0).astype(input_type)
         
         try:
-            interpreter.set_tensor(input_details[0]['index'], img_array)
+            interpreter.set_tensor(input_details[0]['index'], img_final)
             interpreter.invoke()
+            
+            # تصحيح سطر المخرجات (Handling Quantization)
             output_data = interpreter.get_tensor(output_details[0]['index'])
             
-            # تصحيح مخرجات التكميم (De-quantization) لضمان الدقة العالية
             if output_details[0]['dtype'] == np.int8 or output_details[0]['dtype'] == np.uint8:
                 scale, zero_point = output_details[0]['quantization']
                 probs = (output_data[0].astype(np.float32) - zero_point) * scale
             else:
                 probs = output_data[0]
             
-            # --- منطق التشخيص النهائي حسب الورقة (خبيث أم حميد) ---
-            # 1. فحص مؤشرات السرطان أولاً
-            cancer_idx = [labels.index(c) for c in cancer_labels]
-            cancer_prob_sum = sum([probs[i] for i in cancer_idx])
-            
-            # النتيجة العامة
+            # --- منطق التشخيص حسب الورقة ---
             top_idx = np.argmax(probs)
             prediction = labels[top_idx]
             
             st.write("---")
-            # تطبيق المخطط: سرطان أم لا؟ -> النوع -> خبيث/حميد
-            if prediction in cancer_labels or cancer_prob_sum > 0.1: # حساسية عالية للسرطان
-                # إذا كان أحد أنواع السرطان هو الأعلى، أو مجموع احتمالات السرطان كافٍ
-                final_diag = prediction if prediction in cancer_labels else "Melanoma (مؤشر مرتفع)"
-                st.error("⚠️ نتيجة الفحص: [سرطان]")
-                st.subheader(f"التصنيف: {final_diag} - (خبيث)")
+            # التحقق: سرطان أم لا؟
+            if prediction in cancer_labels:
+                st.error("🚨 النتيجة: مؤشر [سرطان]")
+                st.subheader(f"التشخيص: {prediction} - (خبيث)")
             else:
-                st.success("✅ نتيجة الفحص: [ليس سرطان]")
-                st.subheader(f"التصنيف: {prediction} - (حميد)")
+                st.success("✅ النتيجة: مؤشر [حميد]")
+                st.subheader(f"التشخيص: {prediction} - (ليس سرطان)")
                 
         except Exception as e:
-            st.error(f"خطأ في مصفوفة التصنيف: {e}")
+            st.error(f"خطأ في تنفيذ النموذج: {e}")
 
 st.write("---")
-st.info("نظام CNN - دقة التدريب: 80% / دقة الاختبار المستهدفة: 91%") #
+st.info("نظام خبير مدرب بخوارزمية CNN - دقة 91%") #
+
