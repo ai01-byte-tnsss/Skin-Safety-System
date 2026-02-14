@@ -4,14 +4,13 @@ from PIL import Image
 import numpy as np
 import os
 
-# 1. إعدادات الواجهة
+# إعدادات الواجهة
 st.set_page_config(page_title="Skin Safety Expert", page_icon="🩺", layout="centered")
-
 st.title("🩺 Skin Disease Expert System")
 st.markdown(f"### **الدقة الإجمالية للنظام: 53.57%**") #
 st.write("---")
 
-# 2. تحميل النموذج
+# تحميل النموذج
 @st.cache_resource
 def load_model():
     model_path = "skin_expert_refined.tflite"
@@ -23,7 +22,6 @@ def load_model():
 
 interpreter = load_model()
 
-# قائمة الأصناف الـ 24
 labels = ['Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous Disease', 
           'Cellulitis Impetigo', 'Eczema', 'Exanthems and Drug Eruptions', 'Hair Loss Alopecia', 
           'Herpes HPV', 'Light Diseases', 'Lupus and Connective Tissue', 'Melanoma', 
@@ -33,7 +31,6 @@ labels = ['Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 'Bullous
 
 malignant_types = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
 
-# 3. واجهة رفع الصور
 uploaded_file = st.file_uploader("ارفع صورة الجلد لفحصها...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None and interpreter is not None:
@@ -41,46 +38,48 @@ if uploaded_file is not None and interpreter is not None:
     st.image(image, caption='الصورة المرفوعة', use_container_width=True)
     
     if st.button('بدء التشخيص التحليلي'):
-        # --- حل مشكلة السطر 67 (المصفوفة العامة) ---
+        # --- معالجة المصفوفة العامة لتجنب خطأ السطر 67 ---
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
         
-        # قراءة الأبعاد المطلوبة من النموذج نفسه
-        new_height = input_details[0]['shape'][1]
-        new_width = input_details[0]['shape'][2]
+        # قراءة الأبعاد المطلوبة ديناميكياً من النموذج
+        target_height = input_details[0]['shape'][1]
+        target_width = input_details[0]['shape'][2]
         
-        # تغيير حجم الصورة وتحويلها لمصفوفة float32 حصراً
-        img = image.resize((new_width, new_height))
+        # 1. تغيير حجم الصورة لتطابق مصفوفة النموذج
+        img = image.resize((target_width, target_height))
+        
+        # 2. تحويل الصورة إلى مصفوفة Numpy مع التأكد من نوع float32 (أساسي لحل الخطأ)
         img_array = np.array(img, dtype=np.float32)
         
-        # التطبيع (Normalization)
+        # 3. التطبيع (Normalization) لمجال [-1, 1]
         img_array = (img_array / 127.5) - 1.0 
         
-        # إضافة بعد الدفعة لتصبح المصفوفة [1, Height, Width, 3]
+        # 4. إضافة بعد الدفعة لتصبح المصفوفة رباعية الأبعاد [1, H, W, 3]
         img_array = np.expand_dims(img_array, axis=0)
         
         try:
-            # السطر 67: إرسال المصفوفة للنموذج
+            # السطر 67: تغذية النموذج بالمصفوفة
             interpreter.set_tensor(input_details[0]['index'], img_array)
             interpreter.invoke()
             output_data = interpreter.get_tensor(output_details[0]['index'])
             
-            # عرض النتيجة
+            # استخراج النتيجة
             result_idx = np.argmax(output_data[0])
             prediction_name = labels[result_idx]
             
-            st.write(f"### 🔍 التشخيص: {prediction_name}")
+            st.write(f"### 🔍 نتيجة التحليل: {prediction_name}")
             if prediction_name in malignant_types:
-                st.error("التصنيف: خبيث (يستوجب فحص طبي)")
+                st.error("التصنيف الطبي: خبيث")
             else:
-                st.success("التصنيف: حميد")
+                st.success("التصنيف الطبي: حميد")
         except Exception as e:
-            st.error(f"خطأ في معالجة المصفوفة: {e}")
+            # عرض الخطأ بشكل مفصل في حال حدوثه
+            st.error(f"حدث خطأ تقني في مصفوفة البيانات: {e}")
 
-# 4. الملاحظة الطبية
+# الملاحظة الطبية كما في المشروع القديم
 st.write("---")
 st.warning("""
 **⚠️ ملاحظة إخلاء مسؤولية:**
-هذا النظام يعتمد على الذكاء الاصطناعي للأغراض البحثية فقط، وليس تشخيصاً طبياً حقيقياً.
+هذا النظام يعتمد على الذكاء الاصطناعي للأغراض التعليمية فقط، وليس تشخيصاً طبياً حقيقياً.
 """)
-
