@@ -88,3 +88,4 @@ if uploaded_file and interpreter:
 
 st.write("---")
 st.caption("ملاحظة: هذا النظام مخصص للكشف عن مؤشرات السرطان لأغراض بحثية.")
+
