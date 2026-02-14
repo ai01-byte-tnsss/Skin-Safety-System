@@ -90,4 +90,3 @@ if uploaded_file and interpreter:
 
 st.write("---")
 st.warning("⚠️ ملاحظة: هذا النظام بحثي للكشف عن مؤشرات السرطان ولا يغني عن زيارة الطبيب.")
-
