@@ -4,7 +4,7 @@ from PIL import Image
 import numpy as np
 import os
 
-# 1. إعدادات الصفحة الاحترافية
+# 1. إعدادات الصفحة
 st.set_page_config(page_title="Skin Safety Expert", page_icon="🩺", layout="centered")
 
 st.title("🩺 Skin Disease Expert System")
@@ -12,7 +12,7 @@ st.subheader("نظام خبير متقدم لتشخيص وتصنيف الأمر�
 st.markdown(f"### **الدقة الإجمالية للنظام: 53.57%**") # عرض الدقة الكلية للنظام
 st.write("---")
 
-# 2. تحميل نموذج TFLite المستقر
+# 2. تحميل نموذج TFLite
 @st.cache_resource
 def load_tflite_model():
     model_path = "skin_expert_lite.tflite"
@@ -24,7 +24,7 @@ def load_tflite_model():
 
 interpreter = load_tflite_model()
 
-# 3. قائمة الأصناف الـ 24 وتصنيفها الطبي
+# 3. قائمة الأصناف الـ 24
 labels = [
     'Acne and Rosacea', 'Actinic Keratosis', 'Atopic Dermatitis', 
     'Bullous Disease', 'Cellulitis Impetigo', 'Eczema', 
@@ -36,7 +36,7 @@ labels = [
     'Vascular Tumors', 'Vasculitis', 'Warts and Molluscum'
 ]
 
-# تحديد الأنواع السرطانية أو التي تستوجب حذراً شديداً
+# الأنواع التي يصنفها النظام كأورام (خبيثة أو ما قبل سرطانية)
 malignant_types = ['Melanoma', 'Actinic Keratosis', 'Vascular Tumors']
 
 # 4. واجهة التطبيق
@@ -50,34 +50,34 @@ if uploaded_file is not None and interpreter is not None:
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
         
-        # معالجة الصورة بحجم 150 كما يتوقع النموذج
+        # --- حل مشكلة التصنيف الواحد (Preprocessing Fix) ---
         img = image.resize((150, 150)) 
-        img_array = np.array(img, dtype=np.float32) / 255.0
+        img_array = np.array(img, dtype=np.float32)
+        
+        # استخدام معيار التطبيع الخاص بـ MobileNet (حل مشكلة الـ 100% الثابتة)
+        img_array = (img_array / 127.5) - 1.0 
         img_array = np.expand_dims(img_array, axis=0)
         
         interpreter.set_tensor(input_details[0]['index'], img_array)
         interpreter.invoke()
         output_data = interpreter.get_tensor(output_details[0]['index'])
         
+        # الحصول على أعلى نتيجة
         result_idx = np.argmax(output_data)
         prediction_name = labels[result_idx]
-        confidence = np.max(output_data) * 100
         
         st.write("### 🔍 نتائج التحليل المخبري الرقمي:")
         
-        # المنطق البرمجي للتفريق بين السرطان والأمراض الأخرى
+        # التفريق بين السرطان وغيره
         if prediction_name in malignant_types:
             st.error(f"⚠️ تنبيه: تم رصد مؤشرات لنوع من الأورام ({prediction_name})")
             st.subheader("التصنيف: خبيث أو يحتاج مراجعة فورية")
-            st.write("النموذج صنف هذه الحالة ضمن الفئات التي تتطلب تدخلاً طبياً عاجلاً.")
         else:
             st.success(f"✅ التشخيص المتوقع: {prediction_name}")
             st.subheader("التصنيف: حميد (ليس سرطان)")
-            st.write(f"الحالة المكتشفة هي '{prediction_name}' وهي تندرج تحت الأمراض الجلدية غير السرطانية في قاعدة بياناتنا.")
+            st.write(f"هذه الحالة تندرج تحت الأمراض الجلدية غير السرطانية التي تدرب عليها النظام.")
 
-        st.info(f"نسبة الثقة في هذا التشخيص: {confidence:.2f}%")
-
-# 5. الملاحظة القانونية والطبية الصارمة (أسفل الصفحة) كما طلبت
+# 5. التنبيه الطبي وإخلاء المسؤولية كما طلبت
 st.write("---")
 st.warning("""
 **⚠️ إخلاء مسؤولية طبي هام:**
