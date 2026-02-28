@@ -52,7 +52,7 @@ if check_password():
     # --- دالة تحميل نموذج TFLite وتجهيزه ---
     @st.cache_resource
     def load_tflite_model():
-        # استخدام اسم الملف الموجود في صورتك الأخيرة
+        # اسم الملف الموجود في المستودع
         interpreter = tf.lite.Interpreter(model_path="skin_expert_refined.tflite")
         interpreter.allocate_tensors()
         return interpreter
@@ -77,9 +77,19 @@ if check_password():
 
             if analyze_btn:
                 with st.spinner('جاري التحليل السريع باستخدام TFLite...'):
-                    # 1. معالجة الصورة (تغيير الحجم والنوع لتناسب TFLite)
-                    img = image.resize((224, 224))
+                    # 1. معالجة الصورة الشاملة لجميع الأنواع
+                    # التحويل إلى RGB (لإزالة قنوات الشفافية في PNG)
+                    img = image.convert('RGB')
+                    # تغيير الحجم إلى المقاس الذي تدرب عليه النموذج
+                    img = img.resize((224, 224))
+                    
+                    # تحويل الصورة إلى مصفوفة وتطبيع القيم (Normalization)
                     img_array = np.array(img).astype('float32') / 255.0
+                    
+                    # --- التعديل الجوهري لحل خطأ FLOAT16 ---
+                    # تحويل البيانات إلى float16 ليناسب النموذج المُكمّم (Quantized)
+                    img_array = img_array.astype('float16')
+                    
                     img_array = np.expand_dims(img_array, axis=0)
 
                     # 2. تشغيل التنبؤ عبر TFLite
@@ -114,3 +124,4 @@ if check_password():
 
     except Exception as e:
         st.error(f"⚠️ خطأ في تشغيل TFLite: {e}")
+
