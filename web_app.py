@@ -1,4 +1,3 @@
-
 import streamlit as st
 import tensorflow as tf
 from PIL import Image
@@ -7,7 +6,7 @@ import numpy as np
 # ==========================================
 # 1. إعدادات الصفحة والتصميم (CSS)
 # ==========================================
-st.set_page_config(page_title="Skin Safety System Pro", layout="centered")
+st.set_page_config(page_title="Skin Safety System TFLite", layout="centered")
 
 st.markdown("""
     <style>
@@ -40,87 +39,78 @@ def check_password():
 # 3. تشغيل النظام الرئيسي
 # ==========================================
 if check_password():
-    # الهيدر
     st.markdown("<h1 class='title-text'>🛡️ منصة التشخيص الذكي للأمراض الجلدية</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #555;'>نظام خبير يعتمد على الشبكات العصبية التلافيفية (CNN)</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #555;'>نظام خبير يعتمد على الشبكات العصبية (TFLite)</p>", unsafe_allow_html=True)
     
-    # إحصائيات النظام
     m1, m2, m3 = st.columns(3)
     with m1: st.metric("دقة النموذج", "91%")
-    with m2: st.metric("نوع المعالجة", "TFLite")
+    with m2: st.metric("نوع المعالجة", "TFLite Speed")
     with m3: st.metric("حالة النظام", "نشط ✅")
 
     st.divider()
 
-    # تحميل النموذج (cache لسرعة الأداء)
+    # --- دالة تحميل نموذج TFLite وتجهيزه ---
     @st.cache_resource
-    def load_my_model():
-        # *** تم تعديل اسم الملف هنا ليناسب الملف الموجود في المستودع ***
-        return tf.keras.models.load_model('skin_expert_master.h5')
+    def load_tflite_model():
+        # استخدام اسم الملف الموجود في صورتك الأخيرة
+        interpreter = tf.lite.Interpreter(model_path="skin_expert_refined.tflite")
+        interpreter.allocate_tensors()
+        return interpreter
 
     try:
-        model = load_my_model()
+        interpreter = load_tflite_model()
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
         
-        # رفع الصورة
         uploaded_file = st.file_uploader("📥 قم برفع صورة الآفة الجلدية هنا", type=["jpg", "png", "jpeg"])
 
         if uploaded_file is not None:
             image = Image.open(uploaded_file)
             
-            # عرض الصورة بجانب تعليمات
             col_img, col_info = st.columns([1, 1])
             with col_img:
                 st.image(image, caption="الصورة المرفوعة", use_container_width=True)
             
             with col_info:
-                st.info("💡 **نصيحة طبية:** تأكد من أن الإضاءة جيدة والآفة الجلدية واضحة للحصول على أدق نتيجة.")
-                analyze_btn = st.button("🔬 بدء التحليل الرقمي")
+                st.info("💡 **نصيحة طبية:** تأكد من جودة الصورة للحصول على أدق نتيجة.")
+                analyze_btn = st.button("🔬 بدء التحليل (TFLite)")
 
-            # عملية التحليل
             if analyze_btn:
-                with st.spinner('جاري استخلاص الميزات وتحليل الأنماط...'):
-                    # معالجة الصورة بنفس أبعاد التدريب (224, 224)
+                with st.spinner('جاري التحليل السريع باستخدام TFLite...'):
+                    # 1. معالجة الصورة (تغيير الحجم والنوع لتناسب TFLite)
                     img = image.resize((224, 224))
                     img_array = np.array(img).astype('float32') / 255.0
                     img_array = np.expand_dims(img_array, axis=0)
 
-                    # التنبؤ
-                    prediction_prob = model.predict(img_array)[0][0]
+                    # 2. تشغيل التنبؤ عبر TFLite
+                    interpreter.set_tensor(input_details[0]['index'], img_array)
+                    interpreter.invoke()
+                    prediction_prob = interpreter.get_tensor(output_details[0]['index'])[0][0]
                     
-                    # عرض نتيجة التقرير
                     st.markdown("<div class='report-card'>", unsafe_allow_html=True)
                     st.subheader("📋 التقرير التشخيصي النهائي:")
                     st.markdown("---")
 
-                    # المنطق المطور:
-                    # 1. إذا كانت الاحتمالية عالية جداً (تركيز على الخبيث)
+                    # المنطق المطور للتركيز على السرطان
                     if prediction_prob > 0.70:
                         st.error("🚨 **النتيجة: نعم (مؤشرات قوية لورم خبيث - Malignant)**")
-                        st.write("تم رصد أنماط بصرية تتطابق مع خصائص الأورام الجلدية السرطانية.")
-                        st.warning("⚠️ **تنبيه:** يرجى التوجه لطبيب أورام فوراً.")
-
-                    # 2. إذا كانت الاحتمالية منخفضة جداً (حميد)
+                        st.write("تم رصد أنماط بصرية تتطابق مع خصائص الأورام الجلدية.")
+                        st.warning("⚠️ **تنبيه:** يرجى مراجعة المختص فوراً.")
                     elif prediction_prob < 0.35:
                         st.balloons()
                         st.success("✅ **النتيجة: سليم (ورم حميد أو شامة طبيعية - Benign)**")
-                        st.write("الخصائص البصرية تظهر أنسجة مستقرة ولا تشكل خطراً سرطانياً حالياً.")
-
-                    # 3. الحالات المتبقية (مرض جلدي آخر)
+                        st.write("الخصائص البصرية تظهر أنسجة مستقرة.")
                     else:
                         st.warning("🔍 **النتيجة: مرض جلدي آخر (غير سرطاني)**")
-                        st.write("الأنماط المكتشفة تشير إلى وجود **مرض جلدي غير سرطاني** (مثل الأكزيما، الصدفية، أو التهاب جلدي) وليست أوراماً سرطانية.")
+                        st.write("الأنماط تشير إلى وجود **مرض جلدي آخر** (مثل الأكزيما أو الصدفية).")
 
-                    # شريط نسبة الثقة
                     st.markdown("---")
                     st.write(f"**نسبة الثقة في التحليل:** {max(prediction_prob, 1-prediction_prob):.2%}")
                     st.progress(float(prediction_prob))
                     st.markdown("</div>", unsafe_allow_html=True)
 
-        # القائمة الجانبية
-        st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3004/3004456.png", width=100)
-        st.sidebar.markdown("### حول النظام")
-        st.sidebar.info("هذا التطبيق هو جزء من مشروع تخرج لتشخيص سرطان الجلد باستخدام التعلم العميق.")
+        st.sidebar.markdown("### حول النظام (TFLite)")
+        st.sidebar.info("هذا الإصدار يستخدم TFLite لضمان سرعة معالجة عالية واستهلاك أقل للموارد.")
 
     except Exception as e:
-        # رسالة خطأ مفصلة للمساعدة في اكتشاف المشاكل
-        st.error(f"⚠️ خطأ في تحميل النموذج: {e}")
+        st.error(f"⚠️ خطأ في تشغيل TFLite: {e}")
