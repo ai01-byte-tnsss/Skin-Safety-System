@@ -1,3 +1,4 @@
+
 import streamlit as st
 import tensorflow as tf
 from PIL import Image
@@ -54,7 +55,8 @@ if check_password():
     # تحميل النموذج (cache لسرعة الأداء)
     @st.cache_resource
     def load_my_model():
-        return tf.keras.models.load_model('skin_cancer_model.h5')
+        # *** تم تعديل اسم الملف هنا ليناسب الملف الموجود في المستودع ***
+        return tf.keras.models.load_model('skin_expert_master.h5')
 
     try:
         model = load_my_model()
@@ -120,4 +122,5 @@ if check_password():
         st.sidebar.info("هذا التطبيق هو جزء من مشروع تخرج لتشخيص سرطان الجلد باستخدام التعلم العميق.")
 
     except Exception as e:
-        st.error(f"⚠️ خطأ في تحميل النموذج: تأكد من وجود ملف `skin_cancer_model.h5` في المجلد الصحيح.")
+        # رسالة خطأ مفصلة للمساعدة في اكتشاف المشاكل
+        st.error(f"⚠️ خطأ في تحميل النموذج: {e}")
