@@ -52,19 +52,13 @@ if check_password():
     # --- دالة تحميل نموذج TFLite وتجهيزه ---
     @st.cache_resource
     def load_tflite_model():
-        # اسم الملف الموجود في المستودع
-        try:
-            interpreter = tf.lite.Interpreter(model_path="skin_expert_refined.tflite")
-            interpreter.allocate_tensors()
-            return interpreter
-        except Exception as e:
-            st.error(f"⚠️ خطأ في تحميل النموذج: {e}")
-            return None
+        # تأكد أن الملف موجود في نفس مجلد التشغيل
+        interpreter = tf.lite.Interpreter(model_path="skin_expert_refined.tflite")
+        interpreter.allocate_tensors()
+        return interpreter
 
-    # --- تحميل النموذج ---
-    interpreter = load_tflite_model()
-
-    if interpreter:
+    try:
+        interpreter = load_tflite_model()
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
         
@@ -83,12 +77,13 @@ if check_password():
 
             if analyze_btn:
                 with st.spinner('جاري التحليل السريع باستخدام TFLite...'):
-                    # 1. معالجة الصورة الشاملة
+                    # 1. معالجة الصورة
                     img = image.convert('RGB')
                     img = img.resize((224, 224))
                     
-                    # تحويل البيانات إلى float16 ليناسب النموذج المُكمّم
-                    img_array = np.array(img).astype('float16') / 255.0
+                    # تحويل البيانات إلى float32 (الأكثر شيوعاً في TFLite) 
+                    # أو ابقها float16 إذا كان نموذجك مكمماً هكذا
+                    img_array = np.array(img).astype('float32') / 255.0
                     img_array = np.expand_dims(img_array, axis=0)
 
                     # 2. تشغيل التنبؤ عبر TFLite
@@ -99,43 +94,34 @@ if check_password():
                     output_data = interpreter.get_tensor(output_details[0]['index'])[0]
                     
                     # -----------------------------------------------------
-                    # 3. المنطق المطور للتعامل مع نتائج النموذج
+                    # 3. المنطق المصحح للتعامل مع نتائج النموذج
                     # -----------------------------------------------------
                     
                     st.markdown("<div class='report-card'>", unsafe_allow_html=True)
                     st.subheader("📋 التقرير التشخيصي النهائي:")
                     st.markdown("---")
+
+                    # أ. تحديد عدد الفئات المخرجة
+                    num_classes = len(output_data)
                     
-                    # التمييز بناءً على شكل المخرجات (مصفوفة احتمالات أو قيمة واحدة)
-                    if len(output_data) == 3:
-                        # النموذج يخرج احتمالات للفئات الثلاث [سليم، حميد، خبيث]
-                        prob_salam, prob_hamid, prob_khabit = output_data
-                        
-                        # منطق الحساسية (حساس جداً للخبيث)
-                        if prob_khabit > 0.30:
-                            st.error(f"🚨 النتيجة: ورم خبيث (Malignant)")
-                            st.write("⚠️ تنبيه: تم رصد مؤشرات لآفة تستدعي الفحص الطبي الفوري.")
-                        elif prob_hamid > prob_salam:
-                            st.warning(f"🔍 النتيجة: ورم حميد (Benign)")
-                            st.write("ملاحظة: يرجى مراقبة أي تغير في شكل الآفة.")
-                        else:
-                            st.balloons()
-                            st.success(f"✅ النتيجة: سليم (Normal)")
-                            st.write("الجلد سليم.")
+                    # ب. الحصول على الفئة ذات الاحتمالية الأعلى
+                    max_prob_index = np.argmax(output_data)
+                    max_prob_value = output_data[max_prob_index]
+
+                    # ج. تعريف أسماء الفئات (قم بتعديل هذه القائمة لتناسب نموذجك)
+                    # يجب أن يكون الترتيب مطابقاً لترتيب التدريب
+                    class_names = [f"تصنيف {i+1}" for i in range(num_classes)] 
+                    # مثال: class_names = ["سليم", "حميد", "خبيث", "أكزيما", ...]
                     
-                    elif len(output_data) == 1:
-                        # النموذج يخرج قيمة واحدة (مثلاً: 0=سليم، 1=خبيث)
-                        prediction = output_data[0]
-                        if prediction > 0.5:
-                            st.error(f"🚨 النتيجة: مؤشرات ورم (Suspicious)")
-                            st.write("⚠️ تنبيه: يرجى مراجعة طبيب للفحص.")
-                        else:
-                            st.success(f"✅ النتيجة: سليم (Normal)")
-                            st.write("الجلد سليم.")
+                    # د. عرض النتيجة
+                    st.write(f"📊 عدد الفئات المكتشفة: {num_classes}")
                     
+                    if max_prob_value > 0.5:
+                        st.success(f"🔍 التصنيف المتوقع: **{class_names[max_prob_index]}**")
+                        st.write(f"💡 نسبة الثقة: **{max_prob_value:.2%}**")
                     else:
-                        st.error("⚠️ خطأ في تفسير مخرجات النموذج (عدد القيم غير متوقع).")
-                        st.write(f"قيم المخرجات: {output_data}")
+                        st.warning("⚠️ النموذج غير واثق من النتيجة، يرجى عرض الصورة على مختص.")
+                        st.write(f"أعلى تصنيف محتمل: {class_names[max_prob_index]} ({max_prob_value:.2%})")
 
                     st.markdown("---")
                     st.markdown("</div>", unsafe_allow_html=True)
@@ -143,3 +129,5 @@ if check_password():
         st.sidebar.markdown("### حول النظام (TFLite)")
         st.sidebar.info("هذا الإصدار يستخدم TFLite لضمان سرعة معالجة عالية.")
 
+    except Exception as e:
+        st.error(f"⚠️ خطأ في تشغيل TFLite: {e}")
