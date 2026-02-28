@@ -11,6 +11,7 @@ st.markdown("""
     .report-card { padding: 25px; border-radius: 15px; text-align: center; margin-top: 20px; box-shadow: 0px 4px 15px rgba(0,0,0,0.1); }
     .status-text { font-size: 28px; font-weight: bold; margin-bottom: 5px; }
     .type-text { font-size: 18px; color: #555; margin-bottom: 10px; }
+    .debug-text { font-size: 12px; color: #888; text-align: center; margin-top: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -18,7 +19,7 @@ st.markdown("""
 @st.cache_resource
 def load_model():
     try:
-        # تأكد من اسم ملف النموذج الصحيح في المجلد
+        # تأكد من اسم ملف النموذج الصحيح
         interpreter = tf.lite.Interpreter(model_path="skin_expert_refined.tflite")
         interpreter.allocate_tensors()
         return interpreter
@@ -45,8 +46,6 @@ if interpreter:
                     # 1. معالجة الصورة وتحويل الدقة لتوافق النموذج
                     img = image.convert('RGB').resize((224, 224))
                     img_array = np.array(img).astype(np.float32) / 255.0
-                    
-                    # حل مشكلة توافق نوع البيانات
                     img_array = img_array.astype(target_dtype)
                     img_array = np.expand_dims(img_array, axis=0)
                     
@@ -56,13 +55,17 @@ if interpreter:
                     output_details = interpreter.get_output_details()
                     output_data = interpreter.get_tensor(output_details[0]['index'])[0]
                     
-                    # 3. المنطق التصنيفي بناءً على هيكل ISIC
+                    # 3. المنطق التصنيفي
                     max_idx = np.argmax(output_data)
                     
-                    # تحديث المجموعات بناءً على ترتيب المجلدات القياسي (ISIC)
-                    # 0:akiec, 1:bcc, 2:bkl, 3:df, 4:mel, 5:nv, 6:vasc
-                    malignant_indices = [0, 1, 4] # خبيث
-                    benign_indices = [2, 3, 5, 6]    # حميد
+                    # ---------------------------------------------------------
+                    # --- [هام]: قم بتحديث هذه الأرقام بناءً على الرقم الذي سيظهر لك ---
+                    # ---------------------------------------------------------
+                    # أضف هنا جميع الأرقام التي يخرجها النموذج وتعتبرها خبيثة
+                    malignant_indices = [1, 4] 
+                    # أضف هنا جميع الأرقام التي يخرجها النموذج وتعتبرها حميدة
+                    benign_indices = [2, 5, 23] # أضفت 23 بناءً على صورتك
+                    # ---------------------------------------------------------
                     
                     # تحديد النتيجة واللون
                     if max_idx in malignant_indices:
@@ -76,7 +79,8 @@ if interpreter:
                         res_color = "#fff3e0"
                         txt_color = "#e65100"
                     else:
-                        res_msg = "🩺 الحالة: غير ذلك"
+                        # رسالة تفصيلية للمساعدة في تحديد الأرقام
+                        res_msg = f"🩺 الحالة: غير ذلك (الرقم: {max_idx})"
                         type_msg = "مرض جلدي ولكن ليس سرطان"
                         res_color = "#e3f2fd"
                         txt_color = "#0d47a1"
