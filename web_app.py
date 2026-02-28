@@ -18,7 +18,6 @@ st.markdown("""
 @st.cache_resource
 def load_model():
     try:
-        # تأكد من اسم ملف النموذج الصحيح
         interpreter = tf.lite.Interpreter(model_path="skin_expert_refined.tflite")
         interpreter.allocate_tensors()
         return interpreter
@@ -41,27 +40,27 @@ if interpreter:
         
         if st.button("🚀 تحليل الحالة"):
             with st.spinner('جاري الفحص...'):
-                # 1. معالجة الصورة وتحويل الدقة
                 img = image.convert('RGB').resize((224, 224))
                 img_array = np.array(img).astype(np.float32) / 255.0
                 img_array = img_array.astype(target_dtype)
                 img_array = np.expand_dims(img_array, axis=0)
                 
-                # 2. تشغيل النموذج
                 interpreter.set_tensor(input_details[0]['index'], img_array)
                 interpreter.invoke()
                 output_details = interpreter.get_output_details()
                 output_data = interpreter.get_tensor(output_details[0]['index'])[0]
                 
-                # 3. المنطق التصنيفي باستخدام الأرقام المحدثة
+                # ---------------------------------------------------------
+                # --- هذا هو الجزء المهم للاكتشاف (Debugging) ---
+                # ---------------------------------------------------------
                 max_idx = np.argmax(output_data)
                 
-                # --- تحديث: الأرقام الدقيقة بناءً على معايير ISIC/Kaggle ---
-                # خبيث: Melanoma(4), BCC(1), Actinic Keratoses(0)
-                malignant_indices = [0, 1, 4] 
-                # حميد: Benign Keratosis(2), Nevi(5), Dermatofibroma(3), Vascular(6)
-                benign_indices = [2, 3, 5, 6] 
-                
+                # --- [قم بتحديث هذا الجزء بعد معرفة الأرقام الصحيحة] ---
+                # قم بتغيير هذه الأرقام بناءً على ما ستراه في الشاشة
+                malignant_indices = [1, 4]  
+                benign_indices = [0, 2, 3, 5, 6] 
+                # ---------------------------------------------------------
+
                 # تحديد النتيجة واللون
                 if max_idx in malignant_indices:
                     res_msg = "🚨 الحالة: خبيث"
@@ -74,7 +73,8 @@ if interpreter:
                     res_color = "#fff3e0"
                     txt_color = "#e65100"
                 else:
-                    res_msg = "🩺 الحالة: غير ذلك"
+                    # أضفت طباعة الرقم هنا لمساعدتك
+                    res_msg = f"🩺 الحالة: غير ذلك (الرقم: {max_idx})"
                     type_msg = "مرض جلدي ولكن ليس سرطان"
                     res_color = "#e3f2fd"
                     txt_color = "#0d47a1"
