@@ -25,7 +25,7 @@ st.markdown("<p style='text-align: center; color: #555;'>نظام خبير يع�
 
 m1, m2, m3 = st.columns(3)
 with m1: st.metric("دقة النموذج", "91%")
-with m2: st.metric("نوع المعالجة", "TFLite Speed")
+with m2: st.metric("نوع المعالجة", "TFLite Dynamic")
 with m3: st.metric("حالة النظام", "نشط ✅")
 
 st.divider()
@@ -42,6 +42,10 @@ try:
     interpreter = load_tflite_model()
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
+    
+    # --- كشف نوع البيانات المطلوب من النموذج ---
+    target_dtype = input_details[0]['dtype']
+    st.sidebar.write(f"⚙️ نوع البيانات المطلوب: {target_dtype}")
     
     uploaded_file = st.file_uploader("📥 قم برفع صورة الآفة الجلدية هنا", type=["jpg", "png", "jpeg"])
 
@@ -62,12 +66,12 @@ try:
                 img = image.convert('RGB')
                 img = img.resize((224, 224))
                 
-                # --- حل مشكلة FLOAT16 ---
-                # تحويل البيانات إلى float32 أولاً ثم إلى float16 إذا لزم الأمر
-                img_array = np.array(img).astype('float32') / 255.0
+                # --- الحل الشامل للـ float ---
+                # تحويل الصورة إلى مصفوفة بايثون (float32 افتراضياً)
+                img_array = np.array(img).astype(np.float32) / 255.0
                 
-                # إذا استمر خطأ FLOAT16، قم بتفعيل السطر التالي (تعليق السطر السابق)
-                # img_array = np.array(img).astype('float16') / 255.0
+                # تحويل المصفوفة إلى نوع البيانات الذي يتوقعه النموذج تحديداً
+                img_array = img_array.astype(target_dtype)
                 
                 img_array = np.expand_dims(img_array, axis=0)
 
@@ -90,13 +94,10 @@ try:
                 max_prob_index = np.argmax(output_data)
                 max_prob_value = output_data[max_prob_index]
                 
-                # طباعة النتيجة بناءً على المؤشر الأعلى
+                # طباعة النتيجة
                 st.success(f"🔍 التصنيف المتوقع (المؤشر): {max_prob_index}")
                 st.write(f"💡 نسبة الثقة: **{max_prob_value:.2%}**")
                 
-                # ملاحظة: لتحويل المؤشر (0,1,2...) إلى اسم مرض (خبيث/حميد)،
-                # يجب أن تعرف ترتيب الفئات في نموذجك.
-
                 st.markdown("---")
                 st.markdown("</div>", unsafe_allow_html=True)
 
