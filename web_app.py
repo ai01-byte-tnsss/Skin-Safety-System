@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit as st # تصحيح حرف i
 import tensorflow as tf
 from PIL import Image
 import numpy as np
@@ -29,9 +29,11 @@ def load_model():
 interpreter = load_model()
 
 if interpreter:
-
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
+    
+    # معرفة نوع البيانات الذي يتوقعه النموذج (مهم جداً لحل الخطأ)
+    input_type = input_details[0]['dtype']
 
     st.markdown("<h1 style='text-align: center; color: #1a237e;'>🛡️ الفحص الذكي للآفات الجلدية</h1>", unsafe_allow_html=True)
     st.write("<p style='text-align: center;'>نظام يعتمد على الذكاء الاصطناعي لتحليل الحالة الجلدية</p>", unsafe_allow_html=True)
@@ -39,68 +41,60 @@ if interpreter:
     uploaded_file = st.file_uploader("📥 قم برفع صورة الحالة الجلدية", type=["jpg", "jpeg", "png"])
 
     if uploaded_file:
-
         image = Image.open(uploaded_file)
         st.image(image, use_container_width=True)
 
         if st.button("🚀 تحليل الحالة الآن"):
-
             with st.spinner("جاري التحليل..."):
+                try:
+                    # --- معالجة الصورة ---
+                    img = image.convert("RGB").resize((224, 224))
+                    img_array = np.array(img).astype(np.float32) / 255.0
+                    
+                    # السطر السحري: تحويل نوع البيانات ليطابق النموذج تلقائياً
+                    img_array = img_array.astype(input_type) 
+                    
+                    img_array = np.expand_dims(img_array, axis=0)
 
-                # --- معالجة الصورة ---
-                img = image.convert("RGB").resize((224, 224))
-                img_array = np.array(img).astype(np.float32) / 255.0
-                img_array = np.expand_dims(img_array, axis=0)
+                    # --- تشغيل النموذج ---
+                    interpreter.set_tensor(input_details[0]['index'], img_array)
+                    interpreter.invoke()
 
-                # --- تشغيل النموذج ---
-                interpreter.set_tensor(input_details[0]['index'], img_array)
-                interpreter.invoke()
+                    output_data = interpreter.get_tensor(output_details[0]['index'])[0]
+                    max_idx = np.argmax(output_data)
 
-                output_data = interpreter.get_tensor(output_details[0]['index'])[0]
+                    # --- تعريف العائلات ---
+                    malignant_ids = [1, 4, 17]
+                    benign_ids = [2, 5, 23]
 
-                # بعض نماذج TFLite تعطي softmax مسبقاً
-                probs = output_data
-                max_idx = np.argmax(probs)
+                    # --- تحديد النتيجة ---
+                    if max_idx in malignant_ids:
+                        res_msg = "النتيجة: اشتباه ورم خبيث"
+                        sub_msg = "الحالة قد تكون سرطانية وتتطلب فحصاً طبياً عاجلاً"
+                        bg_color, txt_color = "#ffebee", "#b71c1c"
+                        advice = "ينصح بمراجعة طبيب الجلدية لإجراء فحص سريري وربما خزعة."
+                    elif max_idx in benign_ids:
+                        res_msg = "النتيجة: ورم جلدي حميد"
+                        sub_msg = "الآفة الجلدية تبدو من النوع السليم وغير الخطير"
+                        bg_color, txt_color = "#e8f5e9", "#1b5e20"
+                        advice = "لا توجد علامات خطر واضحة، لكن يفضل مراقبة أي تغير بالحجم أو اللون."
+                    else:
+                        res_msg = "النتيجة: غير ذلك"
+                        sub_msg = "تم تصنيف الحالة كمرض جلدي غير سرطاني"
+                        bg_color, txt_color = "#e3f2fd", "#0d47a1"
+                        advice = "قد تكون حالة جلدية شائعة مثل الالتهاب أو الحساسية."
 
-                # --- تعريف العائلات ---
-                malignant_ids = [1, 4, 17]
-                benign_ids = [2, 5, 23]
-
-                # --- تحديد النتيجة ---
-                if max_idx in malignant_ids:
-
-                    res_msg = "النتيجة: اشتباه ورم خبيث"
-                    sub_msg = "الحالة قد تكون سرطانية وتتطلب فحصاً طبياً عاجلاً"
-                    bg_color = "#ffebee"
-                    txt_color = "#b71c1c"
-                    advice = "ينصح بمراجعة طبيب الجلدية لإجراء فحص سريري وربما خزعة."
-
-                elif max_idx in benign_ids:
-
-                    res_msg = "النتيجة: ورم جلدي حميد"
-                    sub_msg = "الآفة الجلدية تبدو من النوع السليم وغير الخطير"
-                    bg_color = "#e8f5e9"
-                    txt_color = "#1b5e20"
-                    advice = "لا توجد علامات خطر واضحة، لكن يفضل مراقبة أي تغير بالحجم أو اللون."
-
-                else:
-
-                    res_msg = "النتيجة: غير ذلك"
-                    sub_msg = "تم تصنيف الحالة كمرض جلدي غير سرطاني"
-                    bg_color = "#e3f2fd"
-                    txt_color = "#0d47a1"
-                    advice = "قد تكون حالة جلدية شائعة مثل الالتهاب أو الحساسية."
-
-                # --- عرض التقرير ---
-                st.markdown(f"""
-                <div class="report-card" style="background-color:{bg_color}; border-color:{txt_color}; color:{txt_color};">
-                    <p class="result-title">{res_msg}</p>
-                    <p class="result-desc">{sub_msg}</p>
-                </div>
-
-                <div class="advice-box">
-                <strong>💡 نصيحة النظام:</strong> {advice}
-                </div>
-                """, unsafe_allow_html=True)
+                    # --- عرض التقرير ---
+                    st.markdown(f"""
+                    <div class="report-card" style="background-color:{bg_color}; border-color:{txt_color}; color:{txt_color};">
+                        <p class="result-title">{res_msg}</p>
+                        <p class="result-desc">{sub_msg}</p>
+                    </div>
+                    <div class="advice-box">
+                    <strong>💡 نصيحة النظام:</strong> {advice}
+                    </div>
+                    """, unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(f"حدث خطأ تقني: {e}")
 
 st.markdown("<br><hr><p style='text-align:center;color:grey;'>نظام دعم قرار طبي للأغراض التعليمية والبحثية فقط</p>", unsafe_allow_html=True)
