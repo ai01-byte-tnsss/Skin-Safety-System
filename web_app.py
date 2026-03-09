@@ -1,4 +1,4 @@
-Import streamlit as st
+import streamlit as st
 import tensorflow as tf
 from PIL import Image
 import numpy as np
@@ -96,3 +96,4 @@ if interpreter:
                     st.error(f"خطأ أثناء التحليل: {e}")
 else:
     st.warning("جاري تهيئة النظام...")
+
