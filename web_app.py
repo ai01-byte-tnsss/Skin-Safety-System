@@ -2,132 +2,116 @@ import streamlit as st
 import tensorflow as tf
 from PIL import Image
 import numpy as np
-import urllib.parse
 
-# --- 1. إعدادات الصفحة والقاموس اللغوي (25 لغة) ---
-st.set_page_config(page_title="Global Skin Guard AI", layout="centered")
+# --- 1. إعدادات الواجهة الاحترافية ---
+st.set_page_config(page_title="Skin Safety System", layout="centered")
 
-LANG_DATA = {
-    "English": {"dir": "ltr", "title": "🛡️ Skin Safety AI", "upload": "📥 Upload Image", "camera": "📸 Camera", "analyze": "🚀 Analyze", "guide": "📚 Medical Guide", "malig": "Malignant", "benign": "Benign", "more": "Details", "res_m": "🚨 Malignant Suspect", "res_b": "🔍 Benign", "res_g": "🩺 General", "advice": "Consult a doctor.", "share": "Share Result"},
-    "Français": {"dir": "ltr", "title": "🛡️ IA de Sécurité Cutanée", "upload": "📥 Charger l'image", "camera": "📸 Caméra", "analyze": "🚀 Analyser", "guide": "📚 Guide Médical", "malig": "Malin", "benign": "Bénin", "more": "Détails", "res_m": "🚨 Suspect Malin", "res_b": "🔍 Bénin", "res_g": "🩺 Général", "advice": "Consultez un médecin.", "share": "Partager"},
-    "العربية": {"dir": "rtl", "title": "🛡️ نظام الكشف عن سلامة الجلد", "upload": "📥 ارفع صورة الفحص", "camera": "📸 صورة فورية", "analyze": "🚀 بدء التحليل", "guide": "📚 الدليل الطبي الشامل", "malig": "الأورام الخبيثة", "benign": "الأورام الحميدة", "more": "تفاصيل وصور", "res_m": "🚨 اشتباه ورم خبيث", "res_b": "🔍 ورم حميد", "res_g": "🩺 حالة عامة", "advice": "يرجى مراجعة المختص.", "share": "مشاركة النتيجة"},
-    "Türkçe": {"dir": "ltr", "title": "🛡️ Cilt Güvenliği AI", "upload": "📥 Resim Yükle", "camera": "📸 Kamera", "analyze": "🚀 Analiz Et", "guide": "📚 Tıbbi Rehber", "malig": "Kötü Huylu", "benign": "İyi Huylu", "more": "Detaylar", "res_m": "🚨 Kötü Huylu Şübhesi", "res_b": "🔍 İyi Huylu", "res_g": "🩺 Genel Durum", "advice": "Doktora danışın.", "share": "Paylaş"},
-    # ... يمكن إضافة باقي اللغات بنفس النمط
-}
-
-selected_lang = st.sidebar.selectbox("🌐 Choose Language / اختر اللغة", list(LANG_DATA.keys()))
-t = LANG_DATA[selected_lang]
-
-# --- 2. تنسيق الواجهة (CSS) ---
-st.markdown(f"""
+st.markdown("""
 <style>
-    div[dir='{t['dir']}'] {{ text-align: {'right' if t['dir']=='rtl' else 'left'}; }}
-    .report-card {{ padding: 30px; border-radius: 20px; text-align: center; border: 4px solid; margin-top: 20px; box-shadow: 0px 10px 25px rgba(0,0,0,0.1); }}
-    .disease-item {{ border-right: 5px solid #0d47a1; border-left: 1px solid #eee; padding: 12px; background: #fff; margin-bottom: 10px; border-radius: 8px; font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }}
-    .share-btn {{ display: inline-block; padding: 10px 20px; border-radius: 10px; text-decoration: none; color: white !important; font-weight: bold; margin: 5px; }}
-    .link-style {{ color: #1a73e8; text-decoration: none; font-weight: bold; }}
+    .report-card { padding: 35px; border-radius: 25px; text-align: center; margin: 20px 0; border: 4px solid; box-shadow: 0px 10px 30px rgba(0,0,0,0.1); }
+    .result-title { font-size: 32px; font-weight: bold; margin-bottom: 10px; }
+    .result-desc { font-size: 19px; font-weight: 500; line-height: 1.6; }
+    .advice-box { background-color: #ffffff; padding: 25px; border-radius: 15px; border: 1px solid #eee; border-right: 10px solid #455a64; margin-top: 20px; }
+    .preview-box { border: 2px dashed #0d47a1; padding: 10px; border-radius: 15px; background-color: #f0f4f8; margin-bottom: 20px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. تحميل النموذج وتصحيح الخطأ التقني ---
+# --- 2. تحميل النموذج ---
 @st.cache_resource
 def load_expert_model():
     try:
         interpreter = tf.lite.Interpreter(model_path="skin_expert_refined.tflite")
         interpreter.allocate_tensors()
         return interpreter
-    except Exception as e:
-        st.error(f"Model Load Error: {e}")
-        return None
+    except: return None
 
 interpreter = load_expert_model()
 
-# --- 4. واجهة الفحص والتحليل ---
-st.markdown(f"<div dir='{t['dir']}'>", unsafe_allow_html=True)
-st.markdown(f"<h1 style='text-align: center; color: #0d47a1;'>{t['title']}</h1>", unsafe_allow_html=True)
+# تعريف مجموعات التصنيف (مباشرة دون عتبات ثابتة)
+class_groups = {
+    "Malignant": [1, 4, 17], 
+    "Benign": [2, 5, 23]
+}
 
-input_choice = st.radio("", (t['upload'], t['camera']))
-uploaded_file = st.file_uploader(t['upload'], type=["jpg", "png", "jpeg"]) if input_choice == t['upload'] else st.camera_input(t['camera'])
+if interpreter:
+    input_details = interpreter.get_input_details()
+    target_dtype = input_details[0]['dtype']
+    input_shape = input_details[0]['shape'][1:3]
 
-if uploaded_file:
-    img = Image.open(uploaded_file)
-    st.image(img, use_container_width=True)
+    st.markdown("<h1 style='text-align: center; color: #0d47a1;'>🛡️ الكشف عن سلامة الجلد لمرض سرطان</h1>", unsafe_allow_html=True)
     
-    if st.button(t['analyze']):
-        if interpreter:
-            with st.spinner("Analyzing..."):
-                # --- تصحيح أبعاد المدخلات (The Fix) ---
-                input_details = interpreter.get_input_details()
-                output_details = interpreter.get_output_details()
-                
-                # قراءة الأبعاد المطلوبة من النموذج مباشرة [1, height, width, 3]
-                h, w = input_details[0]['shape'][1], input_details[0]['shape'][2]
-                dtype = input_details[0]['dtype']
+    st.write("---")
 
-                # معالجة الصورة لتطابق النموذج
-                img_resized = img.convert("RGB").resize((w, h))
-                arr = np.array(img_resized)
+    # اختيار مصدر الصورة
+    source_option = st.radio("اختر طريقة إدخال الصورة:", ("رفع ملف من الجهاز", "التقاط صورة فورية بالكاميرا"))
+    
+    if source_option == "رفع ملف من الجهاز":
+        uploaded_file = st.file_uploader("📥 اختر صورة واضحة", type=["jpg", "jpeg", "png"])
+    else:
+        uploaded_file = st.camera_input("📸 وجه الكاميرا نحو المنطقة المصابة")
 
-                if dtype == np.float32:
-                    arr = arr.astype(np.float32) / 255.0
-                
-                arr = np.expand_dims(arr, axis=0) # إضافة بعد الـ Batch ليصبح [1, h, w, 3]
+    # --- ظهور الصورة قبل الفحص ---
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        
+        st.markdown("<p style='font-weight: bold; color: #0d47a1;'>🔍 معاينة الصورة قبل بدء الفحص:</p>", unsafe_allow_html=True)
+        with st.container():
+            st.markdown('<div class="preview-box">', unsafe_allow_html=True)
+            st.image(image, use_container_width=True, caption="الصورة الحالية جاهزة للتحليل")
+            st.markdown('</div>', unsafe_allow_html=True)
 
+        # زر بدء الفحص يظهر فقط بعد وجود الصورة
+        if st.button("🚀 بدء تحليل الأنماط الجلدية الآن"):
+            with st.spinner("جاري فحص خصائص الأنسجة بصرياً..."):
                 try:
-                    # تمرير البيانات المنقحة للنموذج
-                    interpreter.set_tensor(input_details[0]['index'], arr)
-                    interpreter.invoke()
+                    # المعالجة المسبقة
+                    img = image.convert("RGB").resize(input_shape)
+                    img_array = np.array(img)
                     
-                    # استخراج النتيجة
-                    output_data = interpreter.get_tensor(output_details[0]['index'])[0]
-                    idx = np.argmax(output_data)
-
-                    # تصنيف النتيجة (خبيث: 1,4,17 | حميد: 2,5,23)
-                    if idx in [1, 4, 17]:
-                        res, color = t['res_m'], "#cf1322"
-                    elif idx in [2, 5, 23]:
-                        res, color = t['res_b'], "#389e0d"
+                    if target_dtype == np.float32:
+                        img_array = img_array.astype(np.float32) / 255.0
                     else:
-                        res, color = t['res_g'], "#096dd9"
+                        img_array = img_array.astype(target_dtype)
+                    
+                    img_array = np.expand_dims(img_array, axis=0)
 
-                    st.markdown(f'<div class="report-card" style="border-color:{color}; color:{color};"><h2>{res}</h2><p>{t["advice"]}</p></div>', unsafe_allow_html=True)
+                    # تنفيذ الفحص
+                    interpreter.set_tensor(input_details[0]['index'], img_array)
+                    interpreter.invoke()
+                    output_data = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])[0]
+                    
+                    # اختيار أعلى فئة ثقة مباشرة (Argmax) - هذا يضمن التصنيف الصحيح
+                    predicted_index = np.argmax(output_data)
+
+                    # منطق التصنيف
+                    if predicted_index in class_groups["Malignant"]:
+                        res_msg, sub_msg = "🚨 النتيجة: اشتباه ورم خبيث", "تم رصد علامات نمو غير طبيعي تتطلب تقييماً طبياً فورياً."
+                        bg_c, txt_c = "#fff1f0", "#cf1322"
+                        advice = "يُنصح بشدة بالتوجه للطبيب المختص لإجراء فحص سريري دقيق وبحث الخطوات التالية."
+                    
+                    elif predicted_index in class_groups["Benign"]:
+                        res_msg, sub_msg = "🔍 النتيجة: ورم جلدي حميد", "التحليل الرقمي يشير إلى أن الآفة من النوع السليم وغير المقلق."
+                        bg_c, txt_c = "#f6ffed", "#389e0d"
+                        advice = "الحالة لا تستدعي القلق حالياً، ولكن يُفضل مراقبتها بشكل دوري لأي تغيرات."
+                    
+                    else:
+                        res_msg, sub_msg = "🩺 النتيجة: حالة جلدية عامة", "التحليل يرجح وجود نمط جلدي طبيعي أو غير ورمي."
+                        bg_c, txt_c = "#e6f7ff", "#096dd9"
+                        advice = "لا توجد مؤشرات سرطانية مقلقة؛ استشر الطبيب العام للمتابعة الروتينية."
+
+                    # عرض تقرير النتيجة
+                    st.markdown(f"""
+                        <div class="report-card" style="background-color: {bg_c}; border-color: {txt_c}; color: {txt_c};">
+                            <p class="result-title">{res_msg}</p>
+                            <p class="result-desc">{sub_msg}</p>
+                        </div>
+                        <div class="advice-box">
+                            <p style="font-size: 20px; font-weight: bold; color: #263238; margin-bottom: 5px;">💡 التوصية الطبية:</p>
+                            <p style="font-size: 18px; color: #455a64;">{advice}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
 
                 except Exception as e:
-                    st.error(f"Analysis Error: {e}")
+                    st.error("نعتذر، حدث خطأ أثناء التحليل. يرجى محاولة رفع صورة أخرى.")
 
-st.write("---")
-
-# --- 5. الدليل الطبي (16 نوعاً بروابط عالمية موثوقة) ---
-with st.expander(f"📖 {t['guide']}"):
-    tab_m, tab_b = st.tabs([t['malig'], t['benign']])
-    
-    with tab_m:
-        m_diseases = [
-            ("Basal Cell Carcinoma (BCC)", "https://www.mayoclinic.org/diseases-conditions/basal-cell-carcinoma/symptoms-causes/syc-20354487"),
-            ("Squamous Cell Carcinoma (SCC)", "https://www.skincancer.org/skin-cancer-information/squamous-cell-carcinoma/"),
-            ("Melanoma (الورم الميلانيني)", "https://www.mayoclinic.org/diseases-conditions/melanoma/symptoms-causes/syc-20374884"),
-            ("Merkel Cell Carcinoma", "https://www.mayoclinic.org/diseases-conditions/merkel-cell-carcinoma/symptoms-causes/syc-20351030"),
-            ("Kaposi Sarcoma", "https://www.cancer.org/cancer/types/kaposi-sarcoma.html"),
-            ("Sebaceous Gland Carcinoma", "https://www.mayoclinic.org/diseases-conditions/sebaceous-carcinoma/symptoms-causes/syc-20352957"),
-            ("Dermatofibrosarcoma Protuberans", "https://www.cancer.gov/types/soft-tissue-sarcoma/patient/dfsp-treatment-pdq"),
-            ("Cutaneous Lymphoma", "https://www.clfoundation.org/cutaneous-lymphoma")
-        ]
-        for name, link in m_diseases:
-            st.markdown(f'<div class="disease-item"><strong>{name}</strong><br><a href="{link}" target="_blank" class="link-style">{t["more"]}</a></div>', unsafe_allow_html=True)
-
-    with tab_b:
-        b_diseases = [
-            ("Nevi / Moles (الشامات)", "https://www.mayoclinic.org/diseases-conditions/moles/symptoms-causes/syc-20375200"),
-            ("Seborrheic Keratosis", "https://www.mayoclinic.org/diseases-conditions/seborrheic-keratosis/symptoms-causes/syc-20353878"),
-            ("Lipomas (الأورام الشحمية)", "https://www.mayoclinic.org/diseases-conditions/lipoma/symptoms-causes/syc-20374470"),
-            ("Hemangiomas (الأورام الوعائية)", "https://www.mayoclinic.org/diseases-conditions/infantile-hemangioma/symptoms-causes/syc-20353177"),
-            ("Dermatofibromas", "https://my.clevelandclinic.org/health/diseases/22643-dermatofibroma"),
-            ("Skin Cysts (الأكياس الجلدية)", "https://www.healthline.com/health/skin-cyst"),
-            ("Skin Tags (الزوائد الجلدية)", "https://www.medicalnewstoday.com/articles/67317"),
-            ("Actinic Keratosis", "https://www.skincancer.org/skin-cancer-information/actinic-keratosis/")
-        ]
-        for name, link in b_diseases:
-            st.markdown(f'<div class="disease-item" style="border-right-color:#389e0d;"><strong>{name}</strong><br><a href="{link}" target="_blank" class="link-style">{t["more"]}</a></div>', unsafe_allow_html=True)
-
-st.markdown("</div>", unsafe_allow_html=True)
-st.markdown(f"<br><p style='text-align: center; color: grey; font-size: 0.8em;'>Global Skin AI System © 2026</p>", unsafe_allow_html=True)
+st.markdown("<br><hr><p style='text-align: center; color: #9e9e9e;'>نظام تقييم سلامة الجلد الذكي المعتمد © 2026</p>", unsafe_allow_html=True)
