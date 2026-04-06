@@ -2,37 +2,38 @@ import streamlit as st
 import tensorflow as tf
 from PIL import Image
 import numpy as np
+import urllib.parse
 
 # --- 1. إعدادات الصفحة ---
 st.set_page_config(page_title="Global Skin Guard AI", layout="wide")
 
 # --- 2. القاموس اللغوي الشامل (25 لغة) ---
 LANG_DATA = {
-    "العربية": {"dir": "rtl", "title": "🛡️ نظام الكشف عن سلامة الجلد", "note": "⚠️ للحصول على أدق النتائج، يرجى التصوير في ضوء طبيعي جيد والتركيز على المنطقة المصابة فقط.", "upload": "📥 ارفع صورة الفحص", "camera": "📸 صورة فورية", "analyze": "🚀 بدء التحليل", "guide": "📚 الدليل الطبي الشامل", "malig": "🔴 الأورام الخبيثة", "benign": "🟢 الأورام الحميدة", "res_m": "🚨 اشتباه ورم خبيث", "res_b": "🔍 ورم حميد", "res_g": "🩺 حالة عامة", "advice": "يرجى مراجعة المختص لضمان السلامة."},
-    "English": {"dir": "ltr", "title": "🛡️ Skin Safety AI", "note": "⚠️ For best results, use good natural lighting and focus only on the affected area.", "upload": "📥 Upload Image", "camera": "📸 Camera", "analyze": "🚀 Analyze", "guide": "📚 Medical Guide", "malig": "🔴 Malignant", "benign": "🟢 Benign", "res_m": "🚨 Malignant Suspect", "res_b": "🔍 Benign", "res_g": "🩺 General", "advice": "Please consult a specialist."},
-    "Français": {"dir": "ltr", "title": "🛡️ IA de Sécurité Cutanée", "note": "⚠️ Pour de meilleurs résultats, utilisez un bon éclairage naturel.", "upload": "📥 Charger", "camera": "📸 Caméra", "analyze": "🚀 Analyser", "guide": "📚 Guide Médical", "malig": "🔴 Malin", "benign": "🟢 Bénin", "res_m": "🚨 Suspect Malin", "res_b": "🔍 Bénin", "res_g": "🩺 État Général", "advice": "Consultez un médecin."},
-    "Türkçe": {"dir": "ltr", "title": "🛡️ Cilt Güvenliği AI", "note": "⚠️ En iyi sonuçlar için doğal ışık kullanın.", "upload": "📥 Yükle", "camera": "📸 Kamera", "analyze": "🚀 Analiz Et", "guide": "📚 Tıbbi Rehber", "malig": "🔴 Kötü Huylu", "benign": "🟢 İyi Huylu", "res_m": "🚨 Kötü Huylu Şübhesi", "res_b": "🔍 İyi Huylu", "res_g": "🩺 Genel Durum", "advice": "Doktora danışın."},
-    "Español": {"dir": "ltr", "title": "🛡️ IA Seguridad Cutánea", "note": "⚠️ Para mejores resultados, use luz natural clara.", "upload": "📥 Subir", "camera": "📸 Cámara", "analyze": "🚀 Analizar", "guide": "📚 Guía Médica", "malig": "🔴 Maligno", "benign": "🟢 Benigno", "res_m": "🚨 Sospecha Maligna", "res_b": "🔍 Benigno", "res_g": "🩺 General", "advice": "Consulte a un médico."},
-    "Deutsch": {"dir": "ltr", "title": "🛡️ Hautsicherheits-KI", "note": "⚠️ Für beste Ergebnisse bei natürlichem Licht fotografieren.", "upload": "📥 Hochladen", "camera": "📸 Kamera", "analyze": "🚀 Analysieren", "guide": "📚 Med. Leitfaden", "malig": "🔴 Bösartig", "benign": "🟢 Gutartig", "res_m": "🚨 Krebsverdacht", "res_b": "🔍 Gutartig", "res_g": "🩺 Allgemein", "advice": "Arzt aufsuchen."},
-    "Русский": {"dir": "ltr", "title": "🛡️ ИИ Кожи", "note": "⚠️ Для лучших результатов используйте естественный свет.", "upload": "📥 Загрузить", "camera": "📸 Камера", "analyze": "🚀 Анализ", "guide": "📚 Справочник", "malig": "🔴 Злокачественные", "benign": "🟢 Доброкачественные", "res_m": "🚨 Подозрение на рак", "res_b": "🔍 Доброкачественное", "res_g": "🩺 Общее", "advice": "Обратитесь к врачу."},
-    "中文": {"dir": "ltr", "title": "🛡️ 皮肤安全AI", "note": "⚠️ 为了获得最佳效果，请使用良好的自然光。", "upload": "📥 上传", "camera": "📸 相机", "analyze": "🚀 分析", "guide": "📚 指南", "malig": "🔴 恶性", "benign": "🟢 良性", "res_m": "🚨 疑似恶性", "res_b": "🔍 良性", "res_g": "🩺 一般", "advice": "请咨询医生。"},
-    "हिन्दी": {"dir": "ltr", "title": "🛡️ त्वचा सुरक्षा एआई", "note": "⚠️ सर्वोत्तम परिणामों के लिए, अच्छी प्राकृतिक रोशनी का उपयोग करें।", "upload": "📥 अपलोड", "camera": "📸 कैमरा", "analyze": "🚀 विश्लेषण", "guide": "📚 गाइड", "malig": "🔴 घातक", "benign": "🟢 सौम्य", "res_m": "🚨 घातक संदेह", "res_b": "🔍 सौम्य", "res_g": "🩺 सामान्य", "advice": "डॉक्टर से मिलें।"},
-    "日本語": {"dir": "ltr", "title": "🛡️ 皮膚安全AI", "note": "⚠️ 最良の結果を得るには、自然光を使用してください。", "upload": "📥 アップロード", "camera": "📸 カメラ", "analyze": "🚀 解析", "guide": "📚 ガイド", "malig": "🔴 悪性", "benign": "🟢 良性", "res_m": "🚨 悪性の疑い", "res_b": "🔍 良性", "res_g": "🩺 一般", "advice": "医師に相談。"},
-    "한국어": {"dir": "ltr", "title": "🛡️ 피부 안전 AI", "note": "⚠️ 최상의 결과를 얻으려면 밝은 자연광에서 촬영하세요.", "upload": "📥 업로드", "camera": "📸 카메라", "analyze": "🚀 분석", "guide": "📚 가이드", "malig": "🔴 악성", "benign": "🟢 양성", "res_m": "🚨 악성 의심", "res_b": "🔍 양성", "res_g": "🩺 일반", "advice": "전문가 상담."},
-    "Português": {"dir": "ltr", "title": "🛡️ IA Pele", "note": "⚠️ Para melhores resultados, use luz natural.", "upload": "📥 Enviar", "camera": "📸 Câmera", "analyze": "🚀 Analisar", "guide": "📚 Guia", "malig": "🔴 Maligno", "benign": "🟢 Benigno", "res_m": "🚨 Suspeita", "res_b": "🔍 Benigno", "res_g": "🩺 Geral", "advice": "Consulte médico."},
-    "Italiano": {"dir": "ltr", "title": "🛡️ IA Pelle", "note": "⚠️ Per risultati ottimali, usa una buona luce naturale.", "upload": "📥 Carica", "camera": "📸 Camera", "analyze": "🚀 Analizza", "guide": "📚 Guida", "malig": "🔴 Maligno", "benign": "🟢 Benigno", "res_m": "🚨 Sospetto", "res_b": "🔍 Benigno", "res_g": "🩺 Generale", "advice": "Consulta medico."},
-    "Tiếng Việt": {"dir": "ltr", "title": "🛡️ AI Da Liễu", "note": "⚠️ Để có kết quả tốt nhất, hãy sử dụng ánh sáng tự nhiên.", "upload": "📥 Tải lên", "camera": "📸 Máy ảnh", "analyze": "🚀 Phân tích", "guide": "📚 Hướng dẫn", "malig": "🔴 Ác tính", "benign": "🟢 Lành tính", "res_m": "🚨 Nghi ngờ", "res_b": "🔍 Lành tính", "res_g": "🩺 Tổng quát", "advice": "Hỏi ý kiến bác sĩ."},
-    "فارسی": {"dir": "rtl", "title": "🛡️ هوش مصنوعی پوست", "note": "⚠️ برای بهترین نتیجه، از نور طبیعی خوب استفاده کنید.", "upload": "📥 بارگذاری", "camera": "📸 دوربین", "analyze": "🚀 آنالیز", "guide": "📚 راهنما", "malig": "🔴 بدخیم", "benign": "🟢 خوش‌خیم", "res_m": "🚨 مشکوک", "res_b": "🔍 خوش‌خیم", "res_g": "🩺 عمومی", "advice": "به پزشک بروید."},
-    "اردو": {"dir": "rtl", "title": "🛡️ جلد کی حفاظت AI", "note": "⚠️ بہترین نتائج کے لیے قدرتی روشنی استعمال کریں۔", "upload": "📥 اپلوڈ", "camera": "📸 کیمرہ", "analyze": "🚀 تجزیہ", "guide": "📚 گائیڈ", "malig": "🔴 خطرناک", "benign": "🟢 بے ضرر", "res_m": "🚨 خطرناک شبہ", "res_b": "🔍 بے ضرر", "res_g": "🩺 عام", "advice": "ڈاکٹر سے مشورہ۔"},
-    "کوردی": {"dir": "rtl", "title": "🛡️ پشکنینی پێست", "note": "⚠️ بۆ باشترین ئەنجام، تیشکی سروشتی بەکاربهێنە.", "upload": "📥 وێنە", "camera": "📸 کامێرا", "analyze": "🚀 شیکاری", "guide": "📚 ڕێبەر", "malig": "🔴 خراپ", "benign": "🟢 بێ زیان", "res_m": "🚨 گومانی خراپ", "res_b": "🔍 بێ زیان", "res_g": "🩺 گشتی", "advice": "سەردانی پزیشک."},
-    "Kiswahili": {"dir": "ltr", "title": "🛡️ AI ya Ngozi", "note": "⚠️ Kwa matokeo bora, tumia mwanga wa asili.", "upload": "📥 Pakia", "camera": "📸 Kamera", "analyze": "🚀 Uchambuzi", "guide": "📚 Mwongozo", "malig": "🔴 Saratani", "benign": "🟢 Sio Saratani", "res_m": "🚨 Shaka", "res_b": "🔍 Salama", "res_g": "🩺 Hali ya Jumla", "advice": "Ona daktari."},
-    "Nederlands": {"dir": "ltr", "title": "🛡️ Huid AI", "note": "⚠️ Gebruik natuurlijk licht voor het beste resultaat.", "upload": "📥 Upload", "camera": "📸 Camera", "analyze": "🚀 Analyseer", "guide": "📚 Gids", "malig": "🔴 Kwaadaardig", "benign": "🟢 Goedaardig", "res_m": "🚨 Verdacht", "res_b": "🔍 Goedaardig", "res_g": "🩺 Algemeen", "advice": "Raadpleeg arts."},
-    "Polski": {"dir": "ltr", "title": "🛡️ AI Skóry", "note": "⚠️ Aby uzyskać najlepsze wyniki, użyj światła dziennego.", "upload": "📥 Prześlij", "camera": "📸 Kamera", "analyze": "🚀 Analizuj", "guide": "📚 Przewodnik", "malig": "🔴 Złośliwe", "benign": "🟢 Łagodne", "res_m": "🚨 Podejrzenie", "res_b": "🔍 Łagodne", "res_g": "🩺 Ogólne", "advice": "Skonsultuj lekarza."},
-    "ไทย": {"dir": "ltr", "title": "🛡️ AI ตรวจผิว", "note": "⚠️ เพื่อผลลัพธ์ที่ดีที่สุด ควรใช้แสงธรรมชาติ", "upload": "📥 อัปโหลด", "camera": "📸 กล้อง", "analyze": "🚀 วิเคราะห์", "guide": "📚 คู่มือ", "malig": "🔴 เนื้อร้าย", "benign": "🟢 เนื้อดี", "res_m": "🚨 สงสัยเนื้อร้าย", "res_b": "🔍 เนื้อดี", "res_g": "🩺 ทั่วไป", "advice": "ปรึกษาแพทย์."},
-    "বাংলা": {"dir": "ltr", "title": "🛡️ স্কিন AI", "note": "⚠️ সেরা ফলাফলের জন্য প্রাকৃতিক আলো ব্যবহার করুন।", "upload": "📥 আপলোড", "camera": "📸 ক্যামেরা", "analyze": "🚀 বিশ্লেষণ", "guide": "📚 নির্দেশিকা", "malig": "🔴 মারাত্মক", "benign": "🟢 সৌম্য", "res_m": "🚨 সন্দেহজনক", "res_b": "🔍 সৌম্য", "res_g": "🩺 সাধারণ", "advice": "পরামর্শ নিন।"},
-    "Română": {"dir": "ltr", "title": "🛡️ AI Piele", "note": "⚠️ Pentru rezultate optime, folosiți lumină naturală.", "upload": "📥 Încarcă", "camera": "📸 Cameră", "analyze": "🚀 Analizează", "guide": "📚 Ghid", "malig": "🔴 Malign", "benign": "🟢 Benign", "res_m": "🚨 Suspiciune", "res_b": "🔍 Benign", "res_g": "🩺 General", "advice": "Consultă medic."},
-    "Türkmençe": {"dir": "ltr", "title": "🛡️ Deri AI", "note": "⚠️ Iň gowy netijeler üçin tebigy yşyk ulanyň.", "upload": "📥 Ýükle", "camera": "📸 Kamera", "analyze": "🚀 Analiz", "guide": "📚 Gollanma", "malig": "🔴 Howply", "benign": "🟢 Howpsuz", "res_m": "🚨 Howply şüphe", "res_b": "🔍 Howpsuz", "res_g": "🩺 Umumy", "advice": "Lukmana ýüz tutuň."},
-    "Bahasa Indonesia": {"dir": "ltr", "title": "🛡️ AI Kulit", "note": "⚠️ Untuk hasil terbaik, gunakan pencahayaan alami.", "upload": "📥 Unggah", "camera": "📸 Kamera", "analyze": "🚀 Analisis", "guide": "📚 Panduan", "malig": "🔴 Ganas", "benign": "🟢 Jinak", "res_m": "🚨 Kecurigaan", "res_b": "🔍 Jinak", "res_g": "🩺 Umum", "advice": "Konsultasi dokter."}
+    "العربية": {"dir": "rtl", "title": "🛡️ نظام الكشف عن سلامة الجلد", "note": "⚠️ للحصول على أدق النتائج، يرجى التصوير في ضوء طبيعي جيد والتركيز على المنطقة المصابة فقط.", "upload": "📥 ارفع صورة الفحص", "camera": "📸 صورة فورية", "analyze": "🚀 بدء التحليل", "guide": "📚 الدليل الطبي الشامل", "malig": "🔴 الأورام الخبيثة", "benign": "🟢 الأورام الحميدة", "res_m": "🚨 اشتباه ورم خبيث", "res_b": "🔍 ورم حميد", "res_g": "🩺 حالة عامة", "advice": "يرجى مراجعة المختص لضمان السلامة.", "share_res": "📤 مشاركة النتيجة", "share_app": "🌐 مشاركة الموقع"},
+    "English": {"dir": "ltr", "title": "🛡️ Skin Safety AI", "note": "⚠️ For best results, use good natural lighting and focus only on the affected area.", "upload": "📥 Upload", "camera": "📸 Camera", "analyze": "🚀 Analyze", "guide": "📚 Medical Guide", "malig": "🔴 Malignant", "benign": "🟢 Benign", "res_m": "🚨 Malignant Suspect", "res_b": "🔍 Benign", "res_g": "🩺 General", "advice": "Please consult a specialist.", "share_res": "📤 Share Result", "share_app": "🌐 Share Website"},
+    "Français": {"dir": "ltr", "title": "🛡️ IA de Sécurité Cutanée", "note": "⚠️ Pour de meilleurs résultats, utilisez un bon éclairage naturel.", "upload": "📥 Charger", "camera": "📸 Caméra", "analyze": "🚀 Analyser", "guide": "📚 Guide Médical", "malig": "🔴 Malin", "benign": "🟢 Bénin", "res_m": "🚨 Suspect Malin", "res_b": "🔍 Bénin", "res_g": "🩺 État Général", "advice": "Consultez un médecin.", "share_res": "📤 Partager", "share_app": "🌐 Partager le site"},
+    "Türkçe": {"dir": "ltr", "title": "🛡️ Cilt Güvenliği AI", "note": "⚠️ En iyi sonuçlar için doğal ışık kullanın.", "upload": "📥 Yükle", "camera": "📸 Kamera", "analyze": "🚀 Analiz Et", "guide": "📚 Tıbbi Rehber", "malig": "🔴 Kötü Huylu", "benign": "🟢 İyi Huylu", "res_m": "🚨 Kötü Huylu Şübhesi", "res_b": "🔍 İyi Huylu", "res_g": "🩺 Genel Durum", "advice": "Doktora danışın.", "share_res": "📤 Paylaş", "share_app": "🌐 Siteyi Paylaş"},
+    "Español": {"dir": "ltr", "title": "🛡️ IA Seguridad Cutánea", "note": "⚠️ Para mejores resultados, use luz natural clara.", "upload": "📥 Subir", "camera": "📸 Cámara", "analyze": "🚀 Analizar", "guide": "📚 Guía Médica", "malig": "🔴 Maligno", "benign": "🟢 Benigno", "res_m": "🚨 Sospecha Maligna", "res_b": "🔍 Benigno", "res_g": "🩺 General", "advice": "Consulte a un médico.", "share_res": "📤 Compartir", "share_app": "🌐 Compartir sitio"},
+    "Deutsch": {"dir": "ltr", "title": "🛡️ Hautsicherheits-KI", "note": "⚠️ Für beste Ergebnisse bei natürlichem Licht fotografieren.", "upload": "📥 Hochladen", "camera": "📸 Kamera", "analyze": "🚀 Analysieren", "guide": "📚 Med. Leitfaden", "malig": "🔴 Bösartig", "benign": "🟢 Gutartig", "res_m": "🚨 Krebsverdacht", "res_b": "🔍 Gutartig", "res_g": "🩺 Allgemein", "advice": "Arzt aufsuchen.", "share_res": "📤 Teilen", "share_app": "🌐 Website teilen"},
+    "Русский": {"dir": "ltr", "title": "🛡️ ИИ Кожи", "note": "⚠️ Для лучших результатов используйте естественный свет.", "upload": "📥 Загрузить", "camera": "📸 Камера", "analyze": "🚀 Анализ", "guide": "📚 Справочник", "malig": "🔴 Злокачественные", "benign": "🟢 Доброкачественные", "res_m": "🚨 Подозрение на рак", "res_b": "🔍 Доброкачественное", "res_g": "🩺 Общее", "advice": "Обратитесь к врачу.", "share_res": "📤 Поделиться", "share_app": "🌐 Поделиться сайтом"},
+    "中文": {"dir": "ltr", "title": "🛡️ 皮肤安全AI", "note": "⚠️ 为了获得最佳效果，请使用良好的自然光。", "upload": "📥 上传图片", "camera": "📸 相机", "analyze": "🚀 分析", "guide": "📚 指南", "malig": "🔴 恶性", "benign": "🟢 良性", "res_m": "🚨 疑似恶性", "res_b": "🔍 良性", "res_g": "🩺 一般", "advice": "请咨询医生。", "share_res": "📤 分享结果", "share_app": "🌐 分享网站"},
+    "हिन्दी": {"dir": "ltr", "title": "🛡️ त्वचा सुरक्षा एआई", "note": "⚠️ सर्वोत्तम परिणामों के लिए, अच्छी प्राकृतिक रोशनी का उपयोग करें।", "upload": "📥 अपलोड", "camera": "📸 कैमरा", "analyze": "🚀 विश्लेषण", "guide": "📚 गाइड", "malig": "🔴 घातक", "benign": "🟢 सौम्य", "res_m": "🚨 घातक संदेह", "res_b": "🔍 सौम्य", "res_g": "🩺 सामान्य", "advice": "डॉक्टर से मिलें।", "share_res": "📤 साझा करें", "share_app": "🌐 वेबसाइट साझा करें"},
+    "日本語": {"dir": "ltr", "title": "🛡️ 皮膚安全AI", "note": "⚠️ 最良の結果を得るには、自然光を使用してください。", "upload": "📥 アップロード", "camera": "📸 カメラ", "analyze": "🚀 解析", "guide": "📚 ガイド", "malig": "🔴 悪性", "benign": "🟢 良性", "res_m": "🚨 悪性の疑い", "res_b": "🔍 良性", "res_g": "🩺 一般", "advice": "医師に相談。", "share_res": "📤 共有する", "share_app": "🌐 サイトを共有"},
+    "한국어": {"dir": "ltr", "title": "🛡️ 피부 안전 AI", "note": "⚠️ 최상의 결과를 얻으려면 밝은 자연광에서 촬영하세요.", "upload": "📥 업로드", "camera": "📸 카메라", "analyze": "🚀 분석", "guide": "📚 가이드", "malig": "🔴 악성", "benign": "🟢 양성", "res_m": "🚨 악성 의심", "res_b": "🔍 양성", "res_g": "🩺 일반", "advice": "전문가 상담。", "share_res": "📤 공유하기", "share_app": "🌐 웹사이트 공유"},
+    "Português": {"dir": "ltr", "title": "🛡️ IA Pele", "note": "⚠️ Para melhores resultados, use luz natural.", "upload": "📥 Enviar", "camera": "📸 Câmera", "analyze": "🚀 Analisar", "guide": "📚 Guia", "malig": "🔴 Maligno", "benign": "🟢 Benigno", "res_m": "🚨 Suspeita", "res_b": "🔍 Benigno", "res_g": "🩺 Geral", "advice": "Consulte médico.", "share_res": "📤 Compartilhar", "share_app": "🌐 Partilhar Site"},
+    "Italiano": {"dir": "ltr", "title": "🛡️ IA Pelle", "note": "⚠️ Per risultati ottimali, usa una buona luce naturale.", "upload": "📥 Carica", "camera": "📸 Camera", "analyze": "🚀 Analizza", "guide": "📚 Guida", "malig": "🔴 Maligno", "benign": "🟢 Benigno", "res_m": "🚨 Sospetto", "res_b": "🔍 Benigno", "res_g": "🩺 Generale", "advice": "Consulta medico.", "share_res": "📤 Condividi", "share_app": "🌐 Condividi Sito"},
+    "Tiếng Việt": {"dir": "ltr", "title": "🛡️ AI Da Liễu", "note": "⚠️ Để có kết quả tốt nhất, hãy sử dụng ánh sáng tự nhiên.", "upload": "📥 Tải lên", "camera": "📸 Máy ảnh", "analyze": "🚀 Phân tích", "guide": "📚 Hướng dẫn", "malig": "🔴 Ác tính", "benign": "🟢 Lành tính", "res_m": "🚨 Nghi ngờ", "res_b": "🔍 Lành tính", "res_g": "🩺 Tổng quát", "advice": "Hỏi ý kiến bác sĩ.", "share_res": "📤 Chia sẻ", "share_app": "🌐 Chia sẻ Trang web"},
+    "فارسی": {"dir": "rtl", "title": "🛡️ هوش مصنوعی پوست", "note": "⚠️ برای بهترین نتیجه، از نور طبیعی خوب استفاده کنید.", "upload": "📥 بارگذاری", "camera": "📸 دوربین", "analyze": "🚀 آنالیز", "guide": "📚 راهنما", "malig": "🔴 بدخیم", "benign": "🟢 خوش‌خیم", "res_m": "🚨 مشکوک", "res_b": "🔍 خوش‌خیم", "res_g": "🩺 عمومی", "advice": "به پزشک بروید.", "share_res": "📤 اشتراک‌گذاری", "share_app": "🌐 اشتراک سایت"},
+    "اردو": {"dir": "rtl", "title": "🛡️ جلد کی حفاظت AI", "note": "⚠️ بہترین نتائج کے لیے قدرتی روشنی استعمال کریں۔", "upload": "📥 اپلوڈ", "camera": "📸 کیمرہ", "analyze": "🚀 تجزیہ", "guide": "📚 گائیڈ", "malig": "🔴 خطرناک", "benign": "🟢 بے ضرر", "res_m": "🚨 خطرناک شبہ", "res_b": "🔍 بے ضرر", "res_g": "🩺 عام", "advice": "ڈاکٹر سے مشورہ۔", "share_res": "📤 شیئر کریں", "share_app": "🌐 ویب سائٹ شیئر"},
+    "کوردی": {"dir": "rtl", "title": "🛡️ پشکنینی پێست", "note": "⚠️ بۆ باشترین ئەنجام، تیشکی سروشتی بەکاربهێنە.", "upload": "📥 وێنە", "camera": "📸 کامێرا", "analyze": "🚀 شیکاری", "guide": "📚 ڕێبەر", "malig": "🔴 خراپ", "benign": "🟢 بێ زیان", "res_m": "🚨 گومانی خراپ", "res_b": "🔍 بێ زیان", "res_g": "🩺 گشتی", "advice": "سەردانی پزیشک.", "share_res": "📤 ناردن", "share_app": "🌐 ناردنی لینک"},
+    "Kiswahili": {"dir": "ltr", "title": "🛡️ AI ya Ngozi", "note": "⚠️ Kwa matokeo bora, tumia mwanga wa asili.", "upload": "📥 Pakia", "camera": "📸 Kamera", "analyze": "🚀 Uchambuzi", "guide": "📚 Mwongozo", "malig": "🔴 Saratani", "benign": "🟢 Sio Saratani", "res_m": "🚨 Shaka", "res_b": "🔍 Salama", "res_g": "🩺 Hali ya Jumla", "advice": "Ona daktari.", "share_res": "📤 Shiriki", "share_app": "🌐 Shiriki Tovuti"},
+    "Nederlands": {"dir": "ltr", "title": "🛡️ Huid AI", "note": "⚠️ Gebruik natuurlijk licht voor het beste resultaat.", "upload": "📥 Upload", "camera": "📸 Camera", "analyze": "🚀 Analyseer", "guide": "📚 Gids", "malig": "🔴 Kwaadaardig", "benign": "🟢 Goedaardig", "res_m": "🚨 Verdacht", "res_b": "🔍 Goedaardig", "res_g": "🩺 Algemeen", "advice": "Raadpleeg arts.", "share_res": "📤 Delen", "share_app": "🌐 Website delen"},
+    "Polski": {"dir": "ltr", "title": "🛡️ AI Skóry", "note": "⚠️ Aby uzyskać najlepsze wyniki, użyj światła dziennego.", "upload": "📥 Prześlij", "camera": "📸 Kamera", "analyze": "🚀 Analizuj", "guide": "📚 Przewodnik", "malig": "🔴 Złośliwe", "benign": "🟢 Łagodne", "res_m": "🚨 Podejrzenie", "res_b": "🔍 Łagodne", "res_g": "🩺 Ogólne", "advice": "Skonsultuj lekarza.", "share_res": "📤 Udostępnij", "share_app": "🌐 Udostępnij stronę"},
+    "ไทย": {"dir": "ltr", "title": "🛡️ AI ตรวจผิว", "note": "⚠️ เพื่อผลลัพธ์ที่ดีที่สุด ควรใช้แสงธรรมชาติ", "upload": "📥 อัปโหลด", "camera": "📸 กล้อง", "analyze": "🚀 วิเคราะห์", "guide": "📚 คู่มือ", "malig": "🔴 เนื้อร้าย", "benign": "🟢 เนื้อดี", "res_m": "🚨 สงสัยเนื้อร้าย", "res_b": "🔍 เนื้อดี", "res_g": "🩺 ทั่วไป", "advice": "ปรึกษาแพทย์.", "share_res": "📤 แชร์ผลลัพธ์", "share_app": "🌐 แชร์เว็บไซต์"},
+    "বাংলা": {"dir": "ltr", "title": "🛡️ স্কিন AI", "note": "⚠️ সেরা ফলাফলের জন্য প্রাকৃতিক আলো ব্যবহার করুন।", "upload": "📥 আপলোড", "camera": "📸 ক্যামেরা", "analyze": "🚀 বিশ্লেষণ", "guide": "📚 নির্দেশিকা", "malig": "🔴 মারাত্মক", "benign": "🟢 সৌম্য", "res_m": "🚨 সন্দেহজনক", "res_b": "🔍 সৌম্য", "res_g": "🩺 সাধারণ", "advice": "পরামর্শ নিন।", "share_res": "📤 শেয়ার করুন", "share_app": "🌐 ওয়েবসাইট শেئر"},
+    "Română": {"dir": "ltr", "title": "🛡️ AI Piele", "note": "⚠️ Pentru rezultate optime, folosiți lumină naturală.", "upload": "📥 Încarcă", "camera": "📸 Cameră", "analyze": "🚀 Analizează", "guide": "📚 Ghid", "malig": "🔴 Malign", "benign": "🟢 Benign", "res_m": "🚨 Suspiciune", "res_b": "🔍 Benign", "res_g": "🩺 General", "advice": "Consultă medic.", "share_res": "📤 Distribuie", "share_app": "🌐 Distribuie Site"},
+    "Türkmençe": {"dir": "ltr", "title": "🛡️ Deri AI", "note": "⚠️ Iň gowy netijeler üçin tebigy yşyk ulanyň.", "upload": "📥 Ýükle", "camera": "📸 Kamera", "analyze": "🚀 Analiz", "guide": "📚 Gollanma", "malig": "🔴 Howply", "benign": "🟢 Howpsuz", "res_m": "🚨 Howply şüphe", "res_b": "🔍 Howpsuz", "res_g": "🩺 Umumy", "advice": "Lukmana ýüz tutuň.", "share_res": "📤 Paýlaş", "share_app": "🌐 Saýty paýlaş"},
+    "Bahasa Indonesia": {"dir": "ltr", "title": "🛡️ AI Kulit", "note": "⚠️ Untuk hasil terbaik, gunakan pencahayaan alami.", "upload": "📥 Unggah", "camera": "📸 Kamera", "analyze": "🚀 Analisis", "guide": "📚 Panduan", "malig": "🔴 Ganas", "benign": "🟢 Jinak", "res_m": "🚨 Kecurigaan", "res_b": "🔍 Jinak", "res_g": "🩺 Umum", "advice": "Konsultasi dokter.", "share_res": "📤 Bagikan", "share_app": "🌐 Bagikan Situs"}
 }
 
 # --- 3. التنسيق البصري (ثابت) ---
@@ -45,11 +46,13 @@ st.markdown(f"""
     .report-card {{ padding: 25px; border-radius: 15px; text-align: center; border: 5px solid; margin-top: 20px; }}
     .disease-card {{ border-right: 5px solid #0d47a1; border-left: 1px solid #eee; padding: 15px; background: #f9f9f9; margin-bottom: 10px; border-radius: 10px; }}
     .disease-title {{ font-weight: bold; font-size: 1.1em; margin-bottom: 5px; display: block; }}
-    .note-box {{ background: #fffbe6; border: 1px solid #ffe58f; padding: 10px; border-radius: 8px; margin-bottom: 20px; color: #856404; font-size: 0.9em; }}
+    .note-box {{ background: #fffbe6; border: 1px solid #ffe58f; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #856404; font-size: 0.95em; }}
+    .share-container {{ display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }}
+    .share-btn {{ padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; color: white !important; cursor: pointer; border: none; font-size: 0.9em; }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. المحرك ومعالجة الصور التلقائية (حل FLOAT) ---
+# --- 4. المحرك ومعالجة الصور التلقائية (الدقة والـ Float) ---
 @st.cache_resource
 def load_expert_model():
     try:
@@ -60,18 +63,19 @@ def load_expert_model():
 
 interpreter = load_expert_model()
 
-def prepare_image_dynamic(image, interpreter):
+def prepare_image_precision(image, interpreter):
     input_details = interpreter.get_input_details()
     _, height, width, _ = input_details[0]['shape']
-    target_dtype = input_details[0]['dtype']
+    target_dtype = input_details[0]['dtype'] # استخراج النوع تلقائياً (float16/float32)
     
     img_rgb = image.convert("RGB")
-    img_resized = img_rgb.resize((width, height))
+    # استخدام LANCZOS لأعلى دقة في تغيير الحجم
+    img_resized = img_rgb.resize((width, height), Image.Resampling.LANCZOS)
     img_array = np.array(img_resized).astype(target_dtype)
     img_array = img_array / 255.0
     return np.expand_dims(img_array, axis=0)
 
-# --- 5. واجهة الاستدلال ---
+# --- 5. واجهة الفحص والاستدلال ---
 st.markdown(f"<div dir='{t['dir']}'>", unsafe_allow_html=True)
 st.markdown(f"<h1 style='text-align: center; color: #0d47a1;'>{t['title']}</h1>", unsafe_allow_html=True)
 st.markdown(f'<div class="note-box">{t["note"]}</div>', unsafe_allow_html=True)
@@ -87,7 +91,7 @@ if file:
         if interpreter:
             with st.spinner("Analyzing..."):
                 try:
-                    final_input = prepare_image_dynamic(img, interpreter)
+                    final_input = prepare_image_precision(img, interpreter)
                     in_idx = interpreter.get_input_details()[0]['index']
                     interpreter.set_tensor(in_idx, final_input)
                     interpreter.invoke()
@@ -95,9 +99,10 @@ if file:
                     out_idx = interpreter.get_output_details()[0]['index']
                     output = interpreter.get_tensor(out_idx)[0]
                     
+                    # منطق التصنيف الدقيق
                     idx = np.argmax(output)
 
-                    # منطق التصنيف الصحيح
+                    # المجموعات (تأكد من مطابقتها لنموذجك)
                     if idx in [1, 4, 17]:
                         res_msg, color = t['res_m'], "#cf1322"
                     elif idx in [2, 5, 23]:
@@ -105,8 +110,18 @@ if file:
                     else:
                         res_msg, color = t['res_g'], "#096dd9"
 
-                    # تم إلغاء النسبة المئوية هنا
                     st.markdown(f'<div class="report-card" style="border-color: {color}; color: {color};"><h2>{res_msg}</h2><p>{t["advice"]}</p></div>', unsafe_allow_html=True)
+                    
+                    # --- أزرار مشاركة النتيجة للمريض ---
+                    share_text = urllib.parse.quote(f"*{t['title']}*\nالنتيجة: {res_msg}\n{t['advice']}")
+                    st.markdown(f"""
+                    <div class="share-container">
+                        <p style="width:100%; text-align:center;">{t['share_res']}</p>
+                        <a href="https://api.whatsapp.com/send?text={share_text}" target="_blank" class="share-btn" style="background:#25D366;">WhatsApp</a>
+                        <a href="https://t.me/share/url?url=System&text={share_text}" target="_blank" class="share-btn" style="background:#0088cc;">Telegram</a>
+                    </div>
+                    """, unsafe_allow_html=True)
+
                 except Exception as e:
                     st.error(f"Error: {e}")
 
@@ -143,5 +158,16 @@ with st.expander(f"📖 {t['guide']}"):
         ]
         for n, m, h, s in b_diseases:
             st.markdown(f'<div class="disease-card" style="border-right-color:#389e0d;"><span class="disease-title">🟢 {n}</span><b>الوصف:</b> {m}<br><b>التكوين:</b> {h}<br><b>الأعراض:</b> {s}</div>', unsafe_allow_html=True)
+
+# --- 7. زر مشاركة الموقع في نهاية الصفحة ---
+st.markdown("---")
+app_link = "https://your-project-link.streamlit.app" # رابط موقعك
+st.markdown(f"""
+<div style="text-align: center; padding: 20px;">
+    <p>{t['share_app']}</p>
+    <a href="https://www.facebook.com/sharer/sharer.php?u={app_link}" target="_blank" class="share-btn" style="background:#1877f2; margin:5px;">Facebook</a>
+    <a href="https://twitter.com/intent/tweet?url={app_link}" target="_blank" class="share-btn" style="background:#1da1f2; margin:5px;">X / Twitter</a>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
