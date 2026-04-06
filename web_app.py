@@ -3,36 +3,39 @@ import tensorflow as tf
 from PIL import Image
 import numpy as np
 
-# --- 1. الإعدادات المتقدمة للواجهة ---
-st.set_page_config(page_title="Advanced Skin Analysis System", layout="centered")
+# --- 1. إعدادات الواجهة الاحترافية ---
+st.set_page_config(page_title="Skin Health Detection System", layout="centered")
 
 st.markdown("""
 <style>
-    .report-card { padding: 35px; border-radius: 25px; text-align: center; margin-top: 20px; border: 4px solid; box-shadow: 0px 10px 30px rgba(0,0,0,0.1); }
-    .result-title { font-size: 34px; font-weight: bold; margin-bottom: 15px; }
-    .result-desc { font-size: 21px; font-weight: 500; line-height: 1.7; }
-    .advice-box { background-color: #ffffff; padding: 25px; border-radius: 15px; margin-top: 25px; border-right: 10px solid #455a64; border-left: 1px solid #eee; border-top: 1px solid #eee; border-bottom: 1px solid #eee; }
-    .quality-alert { background-color: #fffbe6; border: 1px solid #ffe58f; padding: 15px; border-radius: 12px; color: #856404; font-weight: 500; }
+    .report-card { padding: 35px; border-radius: 25px; text-align: center; margin: 20px 0; border: 4px solid; box-shadow: 0px 10px 30px rgba(0,0,0,0.1); }
+    .result-title { font-size: 32px; font-weight: bold; margin-bottom: 10px; }
+    .result-desc { font-size: 19px; font-weight: 500; line-height: 1.6; }
+    .advice-box { background-color: #ffffff; padding: 25px; border-radius: 15px; border: 1px solid #eee; border-right: 10px solid #455a64; margin-top: 20px; }
+    .quality-alert { background-color: #fffbe6; border: 1px solid #ffe58f; padding: 15px; border-radius: 10px; color: #856404; font-size: 14px; margin-bottom: 20px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. محرك تحميل النموذج الذكي ---
+# --- 2. تحميل النموذج والبيانات الوصفية ---
 @st.cache_resource
-def load_expert_engine():
+def load_expert_model():
     try:
         interpreter = tf.lite.Interpreter(model_path="skin_expert_refined.tflite")
         interpreter.allocate_tensors()
         return interpreter
-    except Exception as e:
-        st.error(f"❌ عطل في المحرك الأساسي: {e}")
-        return None
+    except: return None
 
-interpreter = load_expert_engine()
+interpreter = load_expert_model()
+
+# تعريف التصنيفات (تأكد من ترتيبها كما في تدريب النموذج)
+# هذا الجزء يجعل الكود يقرأ النتيجة مباشرة من "هوية" الصورة
+class_map = {
+    "Malignant": [1, 4, 17], # فئات السرطان
+    "Benign": [2, 5, 23]     # فئات الأورام الحميدة
+}
 
 if interpreter:
-    # استخراج بصمة النموذج التقنية
     input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
     target_dtype = input_details[0]['dtype']
     input_shape = input_details[0]['shape'][1:3]
 
@@ -40,88 +43,71 @@ if interpreter:
     
     st.markdown("""
         <div class="quality-alert">
-            💡 <b>بروتوكول الفحص:</b> تأكد من رفع صورة قريبة (Macro) للآفة الجلدية، مع إضاءة موزعة جيداً لضمان دقة التصنيف بين الحالات الحميدة والخبيثة.
+            💡 <b>ملاحظة للفحص الفوري:</b> عند التقاط صورة مباشرة، يرجى التأكد من ثبات اليد واستخدام فلاش الكاميرا إذا كانت الإضاءة ضعيفة لضمان دقة تحليل الأنسجة.
         </div>
     """, unsafe_allow_html=True)
 
-    if st.button("🔄 فحص حالة جديدة"):
-        st.rerun()
-
-    uploaded_file = st.file_uploader("📥 ارفع الصورة المجهرية للآفة", type=["jpg", "jpeg", "png"])
+    # خيارين: رفع صورة أو التقاط صورة فورية (تعديل احترافي للمريض)
+    source_option = st.radio("اختر مصدر الصورة:", ("رفع صورة محملة", "التقاط صورة فورية بالكاميرا"))
+    
+    if source_option == "رفع صورة محملة":
+        uploaded_file = st.file_uploader("📥 اختر الصورة من الجهاز", type=["jpg", "jpeg", "png"])
+    else:
+        uploaded_file = st.camera_input("📸 التقط صورة الآفة الجلدية الآن")
 
     if uploaded_file:
         image = Image.open(uploaded_file)
-        st.image(image, use_container_width=True, caption="الصورة قيد التحليل")
-
-        if st.button("🚀 تحليل الأنماط الحيوية"):
-            with st.spinner("جاري إجراء المسح المجهري والموازنة الإحصائية..."):
+        
+        if st.button("🚀 تحليل الصورة وقرار الفحص"):
+            with st.spinner("جاري فحص الأنماط البصرية مباشرة..."):
                 try:
-                    # --- المرحلة 1: المعالجة فائقة الدقة ---
+                    # معالجة الصورة مهما كان مصدرها
                     img = image.convert("RGB").resize(input_shape)
                     img_array = np.array(img)
-                    
-                    # مطابقة DataType (حل نهائي لـ ValueError)
                     if target_dtype == np.float32:
                         img_array = img_array.astype(np.float32) / 255.0
                     else:
                         img_array = img_array.astype(target_dtype)
-                    
                     img_array = np.expand_dims(img_array, axis=0)
 
-                    # --- المرحلة 2: استخلاص النتائج وتطبيق Softmax ---
+                    # تنفيذ الفحص المباشر
                     interpreter.set_tensor(input_details[0]['index'], img_array)
                     interpreter.invoke()
-                    raw_output = interpreter.get_tensor(output_details[0]['index'])[0]
-                    probs = tf.nn.softmax(raw_output).numpy()
-
-                    # --- المرحلة 3: نظام الفئات الذكي (Smart Grouping) ---
-                    # الأكواد المحددة بناءً على متطلباتك
-                    malig_idx = [1, 4, 17]
-                    benign_idx = [2, 5, 23]
+                    output_data = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])[0]
                     
-                    p_malig = sum([probs[i] for i in malig_idx if i < len(probs)])
-                    p_benign = sum([probs[i] for i in benign_idx if i < len(probs)])
-                    p_general = 1.0 - (p_malig + p_benign)
+                    # اختيار أعلى فئة ثقة مباشرة (Argmax)
+                    # هنا الكود يقرأ الصورة ويقرر "ما هي الفئة الأكثر شبهاً بها"
+                    predicted_index = np.argmax(output_data)
 
-                    # --- المرحلة 4: منطق اتخاذ القرار "الاحترافي" (The Expert Logic) ---
-                    # يعتمد هذا المنطق على "الأولوية الأمنية" + "قوة الدليل البصري"
-                    
-                    # أولاً: التحقق من وجود "خطر حقيقي" (عتبة أمان موزونة)
-                    if p_malig >= 0.35 or (p_malig > p_benign and p_malig > 0.20):
-                        res_msg, sub_msg = "🚨 اشتباه ورم خبيث", "تم رصد مؤشرات حيوية غير منتظمة تتطلب تدخلاً طبياً عاجلاً."
+                    # منطق التصنيف التلقائي
+                    if predicted_index in class_map["Malignant"]:
+                        res_msg, sub_msg = "🚨 النتيجة: اشتباه ورم خبيث", "تم رصد علامات نمو غير طبيعي في أنسجة الجلد."
                         bg_c, txt_c = "#fff1f0", "#cf1322"
-                        advice = "يُنصح بشدة بمراجعة طبيب اختصاص الجلدية فوراً. التشخيص المبكر هو مفتاح السلامة."
+                        advice = "يجب التوجه للطبيب المختص لإجراء فحص سريري دقيق وبحث الخطوات القادمة."
                     
-                    # ثانياً: التحقق من "الحالة الحميدة" (يجب أن تكون الأقوى بوضوح)
-                    elif p_benign > p_malig and p_benign > p_general:
-                        res_msg, sub_msg = "🔍 ورم جلدي حميد", "تشير التحليلات الرقمية إلى أن الآفة من النوع السليم حالياً."
+                    elif predicted_index in class_map["Benign"]:
+                        res_msg, sub_msg = "🔍 النتيجة: ورم جلدي حميد", "التحليل الرقمي يشير إلى أن الآفة من النوع السليم."
                         bg_c, txt_c = "#f6ffed", "#389e0d"
-                        advice = "الحالة تبدو مستقرة. يفضل مراقبة أي تغير مفاجئ في الحواف أو اللون."
+                        advice = "الحالة لا تستدعي القلق حالياً، ولكن يُفضل مراقبتها بشكل دوري."
                     
-                    # ثالثاً: الحالة العامة (الالتهابات، الحساسية، إلخ)
                     else:
-                        res_msg, sub_msg = "🩺 حالة جلدية عامة", "التحليل يرجح وجود نمط جلدي غير ورمي (مثل الالتهاب أو الحساسية)."
+                        res_msg, sub_msg = "🩺 النتيجة: حالة جلدية عامة", "التحليل يرجح وجود نمط جلدي طبيعي أو غير ورمي."
                         bg_c, txt_c = "#e6f7ff", "#096dd9"
-                        advice = "هذه الأعراض شائعة في العديد من الحالات الجلدية البسيطة. استشر الطبيب لوصف العلاج الموضعي."
+                        advice = "لا توجد مؤشرات قلق سرطانية؛ استشر طبيبك العام للمتابعة."
 
-                    # --- المرحلة 5: عرض التقرير النهائي (خالي من النسب) ---
+                    # عرض النتيجة
                     st.markdown(f"""
                         <div class="report-card" style="background-color: {bg_c}; border-color: {txt_c}; color: {txt_c};">
                             <p class="result-title">{res_msg}</p>
                             <p class="result-desc">{sub_msg}</p>
                         </div>
                         <div class="advice-box">
-                            <p style="font-size: 20px; font-weight: bold; color: #263238; margin-bottom: 8px;">💡 التوصية الطبية:</p>
-                            <p class="result-desc" style="color: #455a64;">{advice}</p>
+                            <p style="font-size: 20px; font-weight: bold; color: #263238; margin-bottom: 5px;">💡 التوصية الطبية:</p>
+                            <p style="font-size: 18px; color: #455a64;">{advice}</p>
                         </div>
                     """, unsafe_allow_html=True)
 
                 except Exception as e:
-                    st.error(f"⚠️ فشل في إتمام الفحص: {e}")
+                    st.error("نعتذر، حدث خطأ في معالجة الصورة. يرجى التأكد من وضوحها والمحاولة مرة أخرى.")
 
-    # تذييل الصفحة الاحترافي
-    st.write("---")
-    st.markdown("<p style='text-align: center; color: #9e9e9e;'>نظام تقييم سلامة الجلد الذكي - كافة الحقوق محفوظة © 2026</p>", unsafe_allow_html=True)
-
-else:
-    st.error("❌ تعذر تحميل نظام الفحص.")
+st.markdown("<br><hr><p style='text-align: center; color: #9e9e9e;'>نظام تقييم سلامة الجلد الذكي المعتمد © 2026</p>", unsafe_allow_html=True)
