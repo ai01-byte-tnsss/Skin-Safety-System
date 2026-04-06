@@ -12,7 +12,7 @@ LANG_DATA = {
     "English": {"dir": "ltr", "title": "🛡️ Skin Safety AI", "note": "⚠️ For best results, use good natural lighting and focus only on the affected area.", "upload": "📥 Upload Scan", "camera": "📸 Instant Photo", "analyze": "🚀 Analyze", "guide": "📚 Medical Guide (Most Common Types)", "malig": "🔴 Malignant", "benign": "🟢 Benign", "res_m": "🚨 Malignant Suspect", "res_b": "🔍 Benign Result", "res_g": "🩺 Other/General Condition", "advice": "Please consult a specialist."},
     "Français": {"dir": "ltr", "title": "🛡️ IA de Sécurité Cutanée", "note": "⚠️ Pour de meilleurs résultats, utilisez un bon éclairage naturel.", "upload": "📥 Charger", "camera": "📸 Caméra", "analyze": "🚀 Analyser", "guide": "📚 Guide Médical (Types communs)", "malig": "🔴 Malin", "benign": "🟢 Bénin", "res_m": "🚨 Suspect Malin", "res_b": "🔍 Résultat Bénin", "res_g": "🩺 Autre/Général", "advice": "Consultez un spécialiste."},
     "Español": {"dir": "ltr", "title": "🛡️ IA Seguridad Cutánea", "note": "⚠️ Use luz natural para mejores resultados.", "upload": "📥 Subir", "camera": "📸 Cámara", "analyze": "🚀 Analizar", "guide": "📚 Guía Médica (Tipos comunes)", "malig": "🔴 Maligno", "benign": "🟢 Benigno", "res_m": "🚨 Sospecha Maligna", "res_b": "🔍 Benigno", "res_g": "🩺 Otro/General", "advice": "Consulte a un médico."},
-    "Deutsch": {"dir": "ltr", "title": "🛡️ Haut-KI", "note": "⚠️ Nutzen Sie natürliches Licht.", "upload": "📥 Hochladen", "camera": "📸 Kamera", "analyze": "🚀 Analysieren", "guide": "📚 Leitfaden (Häufige Typen)", "malig": "🔴 Bösartig", "benign": "🟢 Gutartig", "res_m": "🚨 Krebsverdacht", "res_b": "🔍 Gutartig", "res_g": "🩺 Allgemein/Andere", "advice": "Arzt aufsuchen."},
+    "Deutsch": {"dir": "ltr", "title": "🛡️ Haut-KI", "note": "⚠️ Nutzen Sie natürliches Licht.", "upload": "📥 Hochladen", "camera": "📸 Kamera", "analyze": "🚀 Analysieren", "guide": "📚 Leitfaden (Häufige Typen)", "malig": "🔴 Bösartig", "benign": "🟢 Gutartig", "res_m": "🚨 Krebsverdacht", "res_b": "🔍 Gutartig", "res_g": "🩺 Allgemeن/Andere", "advice": "Arzt aufsuchen."},
     "中文": {"dir": "ltr", "title": "🛡️ 皮肤安全AI", "note": "⚠️ 为了获得最佳效果，请使用自然光。", "upload": "📥 上传", "camera": "📸 相机", "analyze": "🚀 分析", "guide": "📚 医学指南 (最常见类型)", "malig": "🔴 恶性", "benign": "🟢 良性", "res_m": "🚨 疑似恶性", "res_b": "🔍 良性结果", "res_g": "🩺 其他/一般", "advice": "请咨询医生。"},
     "हिन्दी": {"dir": "ltr", "title": "🛡️ त्वचा सुरक्षा AI", "note": "⚠️ सर्वोत्तम परिणामों के लिए प्राकृतिक रोशनी का उपयोग करें।", "upload": "📥 अपलोड", "camera": "📸 कैमरा", "analyze": "🚀 विश्लेषण", "guide": "📚 चिकित्सा गाइड (सामान्य प्रकार)", "malig": "🔴 घातक", "benign": "🟢 सौम्य", "res_m": "🚨 घातक संदेह", "res_b": "🔍 सौम्य परिणाम", "res_g": "🩺 अन्य/सामान्य", "advice": "विशेषज्ञ से सलाह लें।"},
     "Русский": {"dir": "ltr", "title": "🛡️ ИИ Кожи", "note": "⚠️ Используйте естественный свет.", "upload": "📥 Загрузить", "camera": "📸 Камера", "analyze": "🚀 Анализ", "guide": "📚 Справочник (Частые типы)", "malig": "🔴 Злокачественные", "benign": "🟢 Доброкачественные", "res_m": "🚨 Подозрение", "res_b": "🔍 Доброкачественное", "res_g": "🩺 Общее/Другое", "advice": "Обратитесь к врачу."},
@@ -22,7 +22,7 @@ LANG_DATA = {
     "한국어": {"dir": "ltr", "title": "🛡️ 피부 안전 AI", "note": "⚠️ 자연광에서 촬영하세요.", "upload": "📥 업로드", "camera": "📸 카메라", "analyze": "🚀 분석", "guide": "📚 가이드 (일반적인 유형)", "malig": "🔴 악성", "benign": "🟢 양성", "res_m": "🚨 악성 의심", "res_b": "🔍 양성", "res_g": "🩺 기타/일반", "advice": "전문가 상담。"},
     "Italiano": {"dir": "ltr", "title": "🛡️ IA Pelle", "note": "⚠️ Usa luce naturale.", "upload": "📥 Carica", "camera": "📸 Camera", "analyze": "🚀 Analizza", "guide": "📚 Guida (Tipi comuni)", "malig": "🔴 Maligno", "benign": "🟢 Benigno", "res_m": "🚨 Sospetto", "res_b": "🔍 Benigno", "res_g": "🩺 Altro/Generale", "advice": "Consulta un medico."},
     "اردو": {"dir": "rtl", "title": "🛡️ جلد کی حفاظت AI", "note": "⚠️ قدرتی روشنی استعمال کریں۔", "upload": "📥 اپلوڈ", "camera": "📸 کیمرہ", "analyze": "🚀 تجزیہ", "guide": "📚 گائیڈ (عام اقسام)", "malig": "🔴 خطرناک", "benign": "🟢 بے ضرر", "res_m": "🚨 شبہ", "res_b": "🔍 بے ضرر", "res_g": "🩺 دیگر/عام", "advice": "ڈاکٹر سے مشورہ۔"},
-    "فارسی": {"dir": "rtl", "title": "🛡️ هوش مصنوعی پوست", "note": "⚠️ از نور طبیعی استفاده کنید.", "upload": "📥 بارگذاری", "camera": "📸 دوربین", "analyze": "🚀 آنالیز", "guide": "📚 راهنما (انواع رایج)", "malig": "🔴 بدخیم", "benign": "🟢 خوش‌خیم", "res_m": "🚨 مشکوک", "res_b": "🔍 خوش‌خیم", "res_g": "🩺 سایر/عمومی", "advice": "به پزشک مراجعه کنید."},
+    "فارسي": {"dir": "rtl", "title": "🛡️ هوش مصنوعی پوست", "note": "⚠️ از نور طبیعی استفاده کنید.", "upload": "📥 بارگذاری", "camera": "📸 دوربین", "analyze": "🚀 آنالیز", "guide": "📚 راهنما (انواع رایج)", "malig": "🔴 بدخیم", "benign": "🟢 خوش‌خیم", "res_m": "🚨 مشکوک", "res_b": "🔍 خوش‌خیم", "res_g": "🩺 سایر/عمومی", "advice": "به پزشک مراجعه کنید."},
     "Tiếng Việt": {"dir": "ltr", "title": "🛡️ AI Da Liễu", "note": "⚠️ Sử dụng ánh sáng tự nhiên.", "upload": "📥 Tải lên", "camera": "📸 Máy ảnh", "analyze": "🚀 Phân tích", "guide": "📚 Hướng dẫn (Loại phổ biến)", "malig": "🔴 Ác tính", "benign": "🟢 Lành tính", "res_m": "🚨 Nghi ngờ", "res_b": "🔍 Lành tính", "res_g": "🩺 Khác/Tổng quát", "advice": "Hỏi ý kiến bác sĩ."},
     "Bahasa Indonesia": {"dir": "ltr", "title": "🛡️ AI Kulit", "note": "⚠️ Gunakan cahaya alami.", "upload": "📥 Unggah", "camera": "📸 Kamera", "analyze": "🚀 Analisis", "guide": "📚 Panduan (Jenis Umum)", "malig": "🔴 Ganas", "benign": "🟢 Jinak", "res_m": "🚨 Kecurigaan", "res_b": "🔍 Jinak", "res_g": "🩺 Lainnya/Umum", "advice": "Konsultasi dokter."},
     "Nederlands": {"dir": "ltr", "title": "🛡️ Huid AI", "note": "⚠️ Gebruik natuurlijk licht.", "upload": "📥 Upload", "camera": "📸 Camera", "analyze": "🚀 Analyse", "guide": "📚 Gids (Veelvoorkomend)", "malig": "🔴 Kwaadaardig", "benign": "🟢 Goedaardig", "res_m": "🚨 Verdacht", "res_b": "🔍 Goedaardig", "res_g": "🩺 Overig/Algemeen", "advice": "Raadpleeg arts."},
@@ -35,7 +35,7 @@ LANG_DATA = {
     "Türkmençe": {"dir": "ltr", "title": "🛡️ Deri AI", "note": "⚠️ Tebigy yşyk ulanyň.", "upload": "📥 Ýükle", "camera": "📸 Kamera", "analyze": "🚀 Analiz", "guide": "📚 Gollanma (Adaty görnüşler)", "malig": "🔴 Howply", "benign": "🟢 Howpsuz", "res_m": "🚨 Şüphe", "res_b": "🔍 Howpsuz", "res_g": "🩺 Başga/Umumy", "advice": "Lukmana ýüz tutuň."}
 }
 
-# --- 3. التنسيق البصري وتأثير الليزر ---
+# --- 3. التنسيق البصري ---
 selected_lang = st.sidebar.selectbox("🌐 Choose Language / اختر اللغة", list(LANG_DATA.keys()))
 t = LANG_DATA[selected_lang]
 
@@ -44,25 +44,13 @@ st.markdown(f"""
     div[dir='{t['dir']}'] {{ text-align: {'right' if t['dir']=='rtl' else 'left'}; }}
     .report-card {{ padding: 30px; border-radius: 20px; text-align: center; border: 6px solid; margin-top: 25px; background: white; }}
     .note-box {{ background: #fffbe6; border: 1px solid #ffe58f; padding: 18px; border-radius: 12px; margin-bottom: 25px; color: #856404; }}
-    
-    /* تأثير النبض الليزري حول الصورة */
-    .laser-scan {{
-        position: relative;
-        border: 4px solid #ff4b4b;
-        border-radius: 15px;
-        overflow: hidden;
-        animation: pulse-red 1.5s infinite;
-    }}
-    @keyframes pulse-red {{
-        0% {{ box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }}
-        70% {{ box-shadow: 0 0 0 20px rgba(255, 75, 75, 0); }}
-        100% {{ box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }}
-    }}
+    .laser-scan {{ position: relative; border: 4px solid #ff4b4b; border-radius: 15px; overflow: hidden; animation: pulse-red 1.5s infinite; }}
+    @keyframes pulse-red {{ 0% {{ box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }} 70% {{ box-shadow: 0 0 0 20px rgba(255, 75, 75, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }} }}
     .disease-card {{ border-right: 5px solid #0d47a1; border-left: 1px solid #eee; padding: 15px; background: #f9f9f9; margin-bottom: 12px; border-radius: 10px; }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. المحرك (Float ديناميكي) ---
+# --- 4. المحرك (Float وتصنيف ديناميكي 100%) ---
 @st.cache_resource
 def load_expert_model():
     try:
@@ -99,7 +87,6 @@ if file:
     
     if st.button(t['analyze'], use_container_width=True):
         if interpreter:
-            # تفعيل تأثير الليزر أثناء التحليل
             image_container.markdown('<div class="laser-scan">', unsafe_allow_html=True)
             image_container.image(img, use_container_width=True)
             image_container.markdown('</div>', unsafe_allow_html=True)
@@ -112,23 +99,22 @@ if file:
                     interpreter.invoke()
                     
                     output = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])[0]
-                    idx = np.argmax(output) 
-                    confidence = output[idx]
-
-                    # مجموعات الـ idx الموزعة ديناميكياً
-                    malignant_indices = {1, 4, 6, 8} 
-                    benign_indices = {0, 2, 5, 7}
-
-                    if idx in malignant_indices and confidence > 0.4:
+                    
+                    # الفحص التلقائي: استخراج أعلى فئة مهما كانت قيمتها
+                    idx = int(np.argmax(output)) 
+                    
+                    # تصنيف ديناميكي واسع (تلقائي)
+                    # قمنا بضم الفئات الأكثر شيوعاً طبياً للمجموعات لضمان الفحص التلقائي
+                    if idx in [1, 4, 6, 8, 9]: # فئات احتمالية الورم الخبيث
                         res_msg, color = t['res_m'], "#cf1322"
-                    elif idx in benign_indices and confidence > 0.4:
+                    elif idx in [0, 2, 3, 5, 7]: # فئات احتمالية الورم الحميد
                         res_msg, color = t['res_b'], "#389e0d"
                     else:
-                        res_msg, color = t['res_g'], "#096dd9"
+                        res_msg, color = t['res_g'], "#096dd9" # حالة عامة
 
                     st.markdown(f'<div class="report-card" style="border-color: {color}; color: {color};"><h2>{res_msg}</h2><p>{t["advice"]}</p></div>', unsafe_allow_html=True)
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Error processing: {e}")
 
 st.write("---")
 
