@@ -84,13 +84,13 @@ def load_expert_model():
 model = load_expert_model()
 
 # --- وظيفة التصنيف الموزون المحدثة (Weighted Scoring) ---
-def weighted_analysis(preds, sensitivity_threshold=0.3):
+def weighted_analysis(preds, sensitivity_threshold=0.4):
     # مجموع احتمالات الأورام الخبيثة (0, 1, 4)
     malignant_weight = preds[0] + preds[1] + preds[4]
     # مجموع احتمالات الحالات الحميدة (2, 3, 5, 6)
     benign_weight = preds[2] + preds[3] + preds[5] + preds[6]
     
-    # منطق التنبيه: إذا تجاوز وزن الخباثة العتبة المحددة (0.3) يتم التنبيه فوراً
+    # منطق التنبيه: إذا تجاوز وزن الخباثة العتبة المحددة (0.4) يتم التنبيه فوراً
     if malignant_weight >= sensitivity_threshold:
         return "malignant"
     elif benign_weight > malignant_weight:
