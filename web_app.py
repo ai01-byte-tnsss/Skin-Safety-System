@@ -147,7 +147,7 @@ with r_col2:
 
 # --- 8. الدليل الطبي الشامل (8 خبيث + 8 حميد) ---
 with st.expander(f"📖 {t['guide']}"):
-    m_tab, b_tab, o_tab = st.tabs([t['malig'], t['benign'], "غير ذلك"])
+    m_tab, b_tab, o_tab = st.tabs([t['malig'], t['benign'], "🟡غير ذلك"])
     
     with m_tab:
         mal_list = [
