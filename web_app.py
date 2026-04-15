@@ -196,7 +196,7 @@ m1, m2, m3 = st.columns(3)
 with m1:
     st.metric(
         label="دقة النموذج الكلية (Accuracy)", 
-        value="92.4%", 
+        value="92%", 
         delta="+1.2% عن النماذج التقليدية"
     )
     st.caption("دقة التنبؤ الصحيح في فئات الصور السبعة.")
