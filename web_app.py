@@ -110,11 +110,7 @@ def weighted_analysis(preds, sensitivity_threshold=0.4):
         return "other"
 
 # --- 6. الواجهة والتحليل ---
-/* تنسيق أزرار الرفع لتجنب تداخل النصوص */
-[data-testid="stFileUploader"] section button {
-    width: auto !important;
-    padding: 0 10px !important;
-}
+
 st.markdown(f"<div dir='{t['dir']}'>", unsafe_allow_html=True)
 st.markdown(f"<div class='main-title'>{t['title']}</div>", unsafe_allow_html=True)
 st.markdown(f'<div class="note-box">{t["note"]}</div>', unsafe_allow_html=True)
@@ -122,8 +118,11 @@ st.markdown(f'<div class="note-box">{t["note"]}</div>', unsafe_allow_html=True)
 c1, c2 = st.columns([1, 1])
 
 with c1:
-    choice = st.radio(" ", (t['upload'], t['camera']), horizontal=True)
-    file = st.file_uploader(t['upload'], type=["jpg", "png", "jpeg"]) if choice == t['upload'] else st.camera_input(t['camera'])
+  # السطر المعدل لزر الاختيار (Radio)
+choice = st.radio("", (t['upload'], t['camera']), horizontal=True, label_visibility="collapsed")
+
+# السطر المعدل لأداة الرفع والكاميرا
+file = st.file_uploader("", type=["jpg", "png", "jpeg"], label_visibility="collapsed") if choice == t['upload'] else st.camera_input("", label_visibility="collapsed")
 
 if file:
     img = Image.open(file)
