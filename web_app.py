@@ -50,6 +50,17 @@ t = LANG_DATA[st.session_state.lang]
 
 st.markdown(f"""
 <style>
+/* إخفاء نصوص الأيقونات البرمجية الزائدة التي تظهر فوق النصوص العربية */
+span[data-testid="stWidgetLabel"] p, 
+div[data-testid="stExpander"] summary svg + span,
+div[data-testid="stExpander"] summary span:empty {
+    display: none !important;
+}
+
+/* إخفاء نص السهم البرمجي تحديداً في الـ Expander */
+div[data-testid="stExpander"] summary p {
+    font-family: 'Tajawal', sans-serif !important;
+}
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
     html, body, [class*="st-"] {{ font-family: 'Tajawal', sans-serif; font-size: 16px; }}
     div[dir='{t['dir']}'] {{ text-align: {'right' if t['dir']=='rtl' else 'left'}; }}
@@ -99,6 +110,11 @@ def weighted_analysis(preds, sensitivity_threshold=0.4):
         return "other"
 
 # --- 6. الواجهة والتحليل ---
+/* تنسيق أزرار الرفع لتجنب تداخل النصوص */
+[data-testid="stFileUploader"] section button {
+    width: auto !important;
+    padding: 0 10px !important;
+}
 st.markdown(f"<div dir='{t['dir']}'>", unsafe_allow_html=True)
 st.markdown(f"<div class='main-title'>{t['title']}</div>", unsafe_allow_html=True)
 st.markdown(f'<div class="note-box">{t["note"]}</div>', unsafe_allow_html=True)
