@@ -108,7 +108,19 @@ def weighted_analysis(preds, sensitivity_threshold=0.4):
         return "benign"
     else:
         return "other"
-
+st.markdown("""
+    <style>
+    /* إخفاء نصوص الأيقونات الزائدة وتعديل الحشوة */
+    div[data-testid="stFileUploader"] section button {
+        padding: 0px 10px !important;
+    }
+    
+    /* إخفاء الكلمات البرمجية الزائدة مثل expand_more */
+    span[data-testid="stWidgetLabel"] svg {
+        display: none !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 # --- 6. الواجهة والتحليل ---
 
 st.markdown(f"<div dir='{t['dir']}'>", unsafe_allow_html=True)
@@ -118,15 +130,12 @@ st.markdown(f'<div class="note-box">{t["note"]}</div>', unsafe_allow_html=True)
 c1, c2 = st.columns([1, 1])
 
 with c1:
-  # السطر المعدل لزر الاختيار (Radio)
-choice = st.radio("", (t['upload'], t['camera']), horizontal=True, label_visibility="collapsed")
-
-# السطر المعدل لأداة الرفع والكاميرا
-file = st.file_uploader("", type=["jpg", "png", "jpeg"], label_visibility="collapsed") if choice == t['upload'] else st.camera_input("", label_visibility="collapsed")
-
-if file:
-    img = Image.open(file)
-    with c2:
+        choice = st.radio("", (t['upload'], t['camera']), horizontal=True, label_visibility="collapsed")
+        (تعريف المتغير file أولاً)
+        file = st.file_uploader("", type=["jpg", "png", "jpeg"], label_visibility="collapsed") if choice == t['upload'] else st.camera_input("", label_visibility="collapsed")
+(الآن نتحقق إذا كان المستخدم قد رفع ملفاً)
+        if file:
+            img = Image.open(file)
         st.image(img, use_container_width=True)
     
     if st.button(t['analyze']):
