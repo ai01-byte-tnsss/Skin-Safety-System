@@ -114,14 +114,7 @@ st.markdown("""
     div[data-testid="stFileUploader"] section button {
         padding: 0px 10px !important;
     }
-    
-    /* إخفاء الكلمات البرمجية الزائدة مثل expand_more */
-    span[data-testid="stWidgetLabel"] svg {
-        display: none !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-# --- 6. الواجهة والتحليل ---
+  # --- 6. الواجهة والتحليل ---
 
 st.markdown(f"<div dir='{t['dir']}'>", unsafe_allow_html=True)
 st.markdown(f"<div class='main-title'>{t['title']}</div>", unsafe_allow_html=True)
@@ -130,9 +123,40 @@ st.markdown(f'<div class="note-box">{t["note"]}</div>', unsafe_allow_html=True)
 c1, c2 = st.columns([1, 1])
 
 with c1:
-        choice = st.radio("", (t['upload'], t['camera']), horizontal=True, label_visibility="collapsed")
-        (تعريف المتغير file أولاً)
-        file = st.file_uploader("", type=["jpg", "png", "jpeg"], label_visibility="collapsed") if choice == t['upload'] else st.camera_input("", label_visibility="collapsed")
+    # السطر 121: اختيار طريقة الإدخال بشكل نظيف
+    choice = st.radio("", (t['upload'], t['camera']), horizontal=True, label_visibility="collapsed")
+    
+    # السطر 122: تعريف متغير الملف بناءً على الاختيار
+    file = st.file_uploader("", type=["jpg", "png", "jpeg"], label_visibility="collapsed") if choice == t['upload'] else st.camera_input("", label_visibility="collapsed")
+
+# السطر 124: معالجة الصورة وعرضها في العمود الثاني
+if file:
+    img = Image.open(file)
+    with c2:
+        st.image(img, use_container_width=True, caption=t['upload'])
+    
+    # السطر 129: زر التحليل
+    if st.button(t['analyze']):
+        with st.spinner("🚀 جاري التحليل العميق للصورة..."):
+            img_resized = img.convert("RGB").resize((224, 224))
+            img_array = tf.keras.applications.efficientnet.preprocess_input(np.expand_dims(np.array(img_resized), axis=0))
+            
+            # استخراج التوقعات
+            preds = model.predict(img_array)[0]
+            
+            # تطبيق التصنيف الموزون
+            result_category = weighted_analysis(preds, sensitivity_threshold=0.3)
+            
+            # تحديد اللون والرسالة
+            if result_category == "malignant":
+                res_msg, color = t['res_m'], "#cf1322" 
+            elif result_category == "benign":
+                res_msg, color = t['res_b'], "#389e0d" 
+            else:
+                res_msg, color = t['res_g'], "#096dd9"
+
+            st.markdown(f'<div class="report-card" style="border-color: {color}; color: {color};"><h2>{res_msg}</h2><p>{t["advice"]}</p></div>', unsafe_allow_html=True)  
+ 
 (الآن نتحقق إذا كان المستخدم قد رفع ملفاً)
         if file:
             img = Image.open(file)
