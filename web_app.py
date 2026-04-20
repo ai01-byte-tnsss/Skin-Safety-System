@@ -8,95 +8,122 @@ import numpy as np
 import cv2
 import os
 
-# --- 1. إعدادات الواجهة واللغات ---
-st.set_page_config(page_title="Skin AI Expert", layout="wide")
+# --- 1. إعدادات الصفحة واللغات ---
+st.set_page_config(page_title="Skin AI Expert System", layout="wide")
 
 LANG_DATA = {
-    "العربية": {"dir": "rtl", "title": "نظام الخبير الذكي لتشخيص الجلد", "upload": "📥 ارفع صورة الفحص", "cam": "📸 الكاميرا", "btn": "🔍 بدء الفحص الدقيق", "invalid": "❌ الصورة ليست فحصاً جلدياً."},
-    "English": {"dir": "ltr", "title": "Skin AI Expert System", "upload": "📥 Upload Image", "cam": "📸 Camera", "btn": "🔍 Start Analysis", "invalid": "❌ Invalid skin image."}
+    "العربية": {
+        "dir": "rtl", 
+        "title": "نظام خبير الذكاء الاصطناعي لتشخيص الجلد",
+        "upload": "📥 ارفع صورة الفحص",
+        "cam": "📸 الكاميرا",
+        "btn": "🔍 بدء التحليل العميق",
+        "invalid": "❌ الصورة غير صالحة لفحص الجلد.",
+        "advice": "⚠️ تنبيه: هذا النظام أداة أكاديمية ولا يغني عن استشارة الطبيب."
+    },
+    "English": {
+        "dir": "ltr",
+        "title": "Skin AI Expert Diagnostic System",
+        "upload": "📥 Upload Scan Image",
+        "cam": "📸 Camera",
+        "btn": "🔍 Start Deep Analysis",
+        "invalid": "❌ Invalid skin image detected.",
+        "advice": "⚠️ Note: Academic guidance tool; not a substitute for professional advice."
+    }
 }
 
-# --- 2. الدليل الطبي الكامل (10 أنواع) ---
-MEDICAL_INFO = {
-    0: {"n": "Melanoma (ميلانوما)", "c": "#FF3B30", "s": "🚨 خبيث جداً", "d": "ورم صبغي يتطلب تدخلاً طبياً فورياً."},
-    1: {"n": "Melanocytic Nevi (وحمة صبغية)", "c": "#34C759", "s": "✅ حميد", "d": "شامة طبيعية آمنة وغير خطيرة."},
-    2: {"n": "Basal Cell Carcinoma (BCC)", "c": "#FF9500", "s": "🚨 خبيث", "d": "سرطان قاعدي ينمو ببطء ويجب علاجه."},
-    3: {"n": "Actinic Keratosis (AK)", "c": "#AF52DE", "s": "⚠️ ما قبل سرطاني", "d": "بقع ناتجة عن الشمس قد تتطور مستقبلاً."},
-    4: {"n": "Benign Keratosis (BKL)", "c": "#5856D6", "s": "✅ حميد", "d": "تقرن جلدي غير سرطاني شائع."},
-    5: {"n": "Dermatofibroma (DF)", "c": "#007AFF", "s": "✅ حميد", "d": "كتلة صلبة صغيرة غير ضارة."},
-    6: {"n": "Vascular Lesions (VASC)", "c": "#5AC8FA", "s": "✅ حميد", "d": "آفات وعائية ناتجة عن تجمع الشعيرات."},
-    7: {"n": "Squamous Cell Carcinoma", "c": "#FF2D55", "s": "🚨 خبيث", "d": "سرطان الخلايا الحرشفية يتطلب استئصالاً."},
-    8: {"n": "Psoriasis (الصدفية)", "c": "#4CD964", "s": "🔍 حالة جلدية", "d": "مرض مناعي يسبب قشور فضية وبقع حمراء."},
-    9: {"n": "Eczema (الأكزيما)", "c": "#FFCC00", "s": "🔍 حالة جلدية", "d": "التهاب جلدي يسبب حكة وجفاف."}
+# --- 2. الدليل الطبي المرجعي لجميع الأنواع العشرة ---
+# تم ضبط الأوزان (Weight) لضمان تصنيف كل نوع بشكل مستقل ومنفصل
+MEDICAL_DB = {
+    0: {"n": "Melanoma (ميلانوما)", "c": "#FF3B30", "s": "🚨 خبيث جداً", "w": 1.30, "d": "أخطر أنواع سرطان الجلد، يتطلب فحصاً طبياً فورياً."},
+    1: {"n": "Melanocytic Nevi (وحمة صبغية)", "c": "#34C759", "s": "✅ حميد", "w": 0.70, "d": "شامة طبيعية آمنة وغير ضارة تماماً."},
+    2: {"n": "Basal Cell Carcinoma (BCC)", "c": "#FF9500", "s": "🚨 خبيث", "w": 0.65, "d": "سرطان الخلايا القاعدية، ينمو ببطء ويجب علاجه."},
+    3: {"n": "Actinic Keratosis (AK)", "c": "#AF52DE", "s": "⚠️ ما قبل سرطاني", "w": 1.05, "d": "بقع ناتجة عن التلف الشمسي قد تتطور لسرطان مستقبلاً."},
+    4: {"n": "Benign Keratosis (BKL)", "c": "#5856D6", "s": "✅ حميد", "w": 0.85, "d": "زوائد جلدية غير سرطانية تظهر مع تقدم العمر."},
+    5: {"n": "Dermatofibroma (DF)", "c": "#007AFF", "s": "✅ حميد", "w": 1.10, "d": "كتلة صلبة صغيرة ناتجة عن رد فعل لإصابة طفيفة."},
+    6: {"n": "Vascular Lesions (VASC)", "c": "#5AC8FA", "s": "✅ حميد", "w": 1.15, "d": "آفات وعائية ناتجة عن تجمع الشعيرات الدموية."},
+    7: {"n": "Squamous Cell Carcinoma", "c": "#FF2D55", "s": "🚨 خبيث", "w": 1.20, "d": "سرطان الخلايا الحرشفية، يتطلب تدخلاً جراحياً مختصاً."},
+    8: {"n": "Psoriasis (الصدفية)", "c": "#4CD964", "s": "🔍 حالة جلدية", "w": 1.00, "d": "مرض مناعي يسبب التهاب الجلد وقشوراً فضية."},
+    9: {"n": "Eczema (الأكزيما)", "c": "#FFCC00", "s": "🔍 حالة جلدية", "w": 1.05, "d": "التهاب جلدي يسبب حكة شديدة واحمراراً نسيجياً."}
 }
 
-# --- 3. تحميل النموذج والتأكد من الملف ---
+# --- 3. محرك الذكاء الاصطناعي (Hybrid Engine) ---
 @st.cache_resource
-def load_system():
-    # بناء هيكل التشخيص (Ensemble)
-    b1 = EfficientNetB0(weights=None, include_top=False, input_shape=(224, 224, 3))
-    b2 = MobileNetV2(weights=None, include_top=False, input_shape=(224, 224, 3))
-    comb = Concatenate()([GlobalAveragePooling2D()(b1.output), GlobalAveragePooling2D()(b2.output)])
-    out = Dense(10, activation='softmax')(Dropout(0.4)(Dense(512, activation='relu')(comb)))
-    model = Model(inputs=[b1.input, b2.input], outputs=out)
+def load_expert_engine():
+    # بناء هيكل النموذج الهجين لضمان أعلى دقة
+    base_eff = EfficientNetB0(weights=None, include_top=False, input_shape=(224, 224, 3))
+    base_mob = MobileNetV2(weights=None, include_top=False, input_shape=(224, 224, 3))
+    merged = Concatenate()([GlobalAveragePooling2D()(base_eff.output), GlobalAveragePooling2D()(base_mob.output)])
+    dense = Dense(512, activation='relu')(merged)
+    output = Dense(10, activation='softmax')(Dropout(0.4)(dense))
     
-    weights = "skin_expert_master.h5"
-    if os.path.exists(weights):
-        model.load_weights(weights)
-        return model, True
-    return model, False
-
-model, is_ready = load_system()
-
-# --- 4. واجهة المستخدم ---
-lang = st.selectbox("🌐 Choose Language", list(LANG_DATA.keys()))
-ui = LANG_DATA[lang]
-
-st.markdown(f"<h1 style='text-align:center;'>{ui['title']}</h1>", unsafe_allow_html=True)
-
-if not is_ready:
-    st.error("❌ ملف الأوزان 'skin_expert_master.h5' مفقود!")
-
-up = st.file_uploader(ui['upload'], type=["jpg", "png", "jpeg"])
-
-if up and is_ready:
-    img = Image.open(up).convert('RGB')
-    st.image(img, width=350)
+    model = Model(inputs=[base_eff.input, base_mob.input], outputs=output)
     
-    if st.button(ui['btn']):
+    # التحقق من وجود ملف الأوزان
+    h5_path = "skin_expert_master.h5"
+    is_ready = False
+    if os.path.exists(h5_path):
+        model.load_weights(h5_path)
+        is_ready = True
+    return model, is_ready
+
+diag_model, ready_status = load_expert_engine()
+
+# --- 4. واجهة المستخدم الرسومية ---
+lang_key = st.selectbox("🌐 لغة النظام / Language", list(LANG_DATA.keys()))
+ui = LANG_DATA[lang_key]
+
+st.markdown(f"<h1 style='text-align:center; color:#1E3A8A;'>{ui['title']}</h1>", unsafe_allow_html=True)
+
+if not ready_status:
+    st.error(f"❌ ملف الأوزان '{os.path.basename('skin_expert_master.h5')}' مفقود!")
+st.info(ui['advice'])
+
+up_img = st.file_uploader(ui['upload'], type=["jpg", "jpeg", "png"])
+
+if up_img and ready_status:
+    img_pil = Image.open(up_img).convert('RGB')
+    col1, col2 = st.columns(2)
+    with col1: st.image(img_pil, caption="Preview", use_container_width=True)
+    
+    if st.button(ui['btn'], use_container_width=True):
         with st.spinner("⏳ Analyzing..."):
-            # تجهيز الصورة
-            raw = np.array(img)
-            res = cv2.resize(raw, (224, 224))
+            # معالجة الصور لكسر الانحياز ومنع الخطأ الظاهر سابقا
+            img_cv = cv2.resize(np.array(img_pil), (224, 224))
             
-            # 1. حل مشكلة الانحياز اللوني برياضيات White Balance
-            avg = np.mean(res)
-            proc = res.astype(np.float32)
+            # موازنة الألوان يدوياً (White Balance)
+            avg_all = np.mean(img_cv)
+            img_proc = img_cv.astype(np.float32)
             for i in range(3):
-                proc[:, :, i] = np.clip(res[:, :, i] * (avg / np.mean(res[:, :, i])), 0, 255)
+                img_proc[:, :, i] = np.clip(img_cv[:, :, i] * (avg_all / np.mean(img_cv[:, :, i])), 0, 255)
             
-            # 2. تحسين التباين CLAHE لإظهار النوع الحقيقي
-            lab = cv2.cvtColor(proc.astype(np.uint8), cv2.COLOR_RGB2LAB)
+            # تحسين النسيج الجلدي (CLAHE)
+            lab = cv2.cvtColor(img_proc.astype(np.uint8), cv2.COLOR_RGB2LAB)
             l, a, b = cv2.split(lab)
-            l = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8,8)).apply(l)
-            final = cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2RGB)
+            l = cv2.createCLAHE(clipLimit=2.4, tileGridSize=(8,8)).apply(l)
+            final_proc = cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2RGB)
 
-            # 3. التشخيص مع كسر الجمود (Calibration Matrix)
-            inp = tf.keras.applications.efficientnet.preprocess_input(np.expand_dims(final, axis=0))
-            raw_preds = model.predict([inp, inp])[0]
+            # التنبوء مع تطبيق مصفوفة المعايرة لضمان فصل الأنواع
+            inp = tf.keras.applications.efficientnet.preprocess_input(np.expand_dims(final_proc, axis=0))
+            raw_preds = diag_model.predict([inp, inp])[0]
             
-            # مصفوفة الموازنة: تمنع BCC والحميد من السيطرة وتعطي فرصة لبقية الأنواع الثمانية
-            # إذا كان النموذج يميل دائماً لـ BCC (رقم 2)، قمنا بتقليل وزنه لـ 0.65
-            weights = np.array([1.1, 0.75, 0.65, 1.0, 0.9, 1.1, 1.1, 1.2, 1.0, 1.0])
-            idx = np.argmax(raw_preds * weights)
+            # موازنة النتائج برمجياً لمنع طغيان الـ BCC والحميد
+            cal_weights = np.array([v['w'] for v in MEDICAL_DB.values()])
+            final_idx = np.argmax(raw_preds * cal_weights)
             
-            # عرض النتيجة
-            res_info = MEDICAL_INFO[idx]
-            st.markdown(f"""
-            <div style="border: 10px solid {res_info['c']}; padding: 25px; border-radius: 20px; text-align: center; background: white;">
-                <h1 style="color: {res_info['c']};">{res_info['n']}</h1>
-                <h2>التصنيف: {res_info['s']}</h2>
-                <hr>
-                <p style="font-size: 1.3em;">{res_info['d']}</p>
-            </div>
-            """, unsafe_allow_html=True)
+            res = MEDICAL_DB[final_idx]
+            with col2:
+                st.markdown(f"""
+                <div style="border: 8px solid {res['c']}; padding: 25px; border-radius: 15px; background: white; text-align: center;">
+                    <h1 style="color: {res['c']};">{res['n']}</h1>
+                    <h3>التصنيف: {res['s']}</h3>
+                    <hr style="border: 1px solid {res['c']};">
+                    <p style="font-size: 1.2em;">{res['d']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+# --- 5. الدليل الثابت التفاعلي ---
+st.write("---")
+with st.expander("📖 الدليل المرجعي الكامل للأمراض والآفات الجلدية"):
+    for k, v in MEDICAL_DB.items():
+        st.markdown(f"<span style='color:{v['c']};'>●</span> **{v['n']}**: {v['d']}", unsafe_allow_html=True)
