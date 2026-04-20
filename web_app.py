@@ -7,143 +7,142 @@ from PIL import Image
 import numpy as np
 import cv2
 
-# --- 1. إعدادات الصفحة ---
+# --- 1. إعدادات الصفحة واللغات ---
 st.set_page_config(page_title="Global Skin AI Expert", layout="wide")
 
-# --- 2. القاموس العالمي الشامل (20 لغة) ---
+# القاموس العالمي لـ 20 لغة
 LANG_DATA = {
-    "العربية": {"dir": "rtl", "title": "نظام الفحص الذكي العالمي للجلد", "btn": "🔍 بدء الفحص", "upload": "📥 ارفع صورة", "cam": "📸 كاميرا", "invalid": "❌ صورة غير صالحة.", "advice": "⚠️ تنبيه: استشر طبيباً مختصاً فوراً."},
-    "English": {"dir": "ltr", "title": "Global Skin AI Diagnostic System", "btn": "🔍 Start Scan", "upload": "📥 Upload", "cam": "📸 Camera", "invalid": "❌ Invalid image.", "advice": "⚠️ Note: Consult a doctor immediately."},
-    "Français": {"dir": "ltr", "title": "IA de Diagnostic Cutané", "btn": "🔍 Analyser", "upload": "📥 Charger", "cam": "📸 Caméra", "invalid": "❌ Image invalide.", "advice": "⚠️ Note: Consultez un médecin."},
-    "Español": {"dir": "ltr", "title": "IA de Diagnóstico Cutáneo", "btn": "🔍 Analizar", "upload": "📥 Subir", "cam": "📸 Cámara", "invalid": "❌ Imagen inválida.", "advice": "⚠️ Nota: Consulte a un médico."},
-    "Deutsch": {"dir": "ltr", "title": "KI Hautdiagnosesystem", "btn": "🔍 Analyse", "upload": "📥 Hochladen", "cam": "📸 Kamera", "invalid": "❌ Ungültiges Bild.", "advice": "⚠️ Hinweis: Arzt aufsuchen."},
-    "中文": {"dir": "ltr", "title": "皮肤人工智能诊断系统", "btn": "🔍 开始扫描", "upload": "📥 上传", "cam": "📸 相机", "invalid": "❌ 图像无效。", "advice": "⚠️ 注意：请立即咨询医生。"},
-    "हिन्दी": {"dir": "ltr", "title": "त्वचा एआई नैदानिक प्रणाली", "btn": "🔍 स्कैन शुरू करें", "upload": "📥 अपलोड", "cam": "📸 कैमरा", "invalid": "❌ अमान्य छवि।", "advice": "⚠️ नोट: डॉक्टर से सलाह लें।"},
-    "Русский": {"dir": "ltr", "title": "ИИ система диагностики кожи", "btn": "🔍 Начать", "upload": "📥 Загрузить", "cam": "📸 Камера", "invalid": "❌ Ошибка изображения.", "advice": "⚠️ Примечание: Обратитесь к врачу."},
-    "日本語": {"dir": "ltr", "title": "皮膚AI診断システム", "btn": "🔍 解析開始", "upload": "📥 アップロード", "cam": "📸 カメラ", "invalid": "❌ 無効な画像。", "advice": "⚠️ 注意：医師にご相談ください。"},
-    "Português": {"dir": "ltr", "title": "IA de Diagnóstico de Pele", "btn": "🔍 Analisar", "upload": "📥 Carregar", "cam": "📸 Câmera", "invalid": "❌ Imagem inválida.", "advice": "⚠️ Nota: Consulte um médico."},
-    "Türkçe": {"dir": "ltr", "title": "Cilt AI Tanı Sistemi", "btn": "🔍 Analiz Et", "upload": "📥 Yükle", "cam": "📸 Kamera", "invalid": "❌ Geçersiz resim.", "advice": "⚠️ Not: Hemen doktora danışın."},
-    "한국어": {"dir": "ltr", "title": "피부 AI 진단 시스템", "btn": "🔍 분석 시작", "upload": "📥 업로드", "cam": "📸 카메라", "invalid": "❌ 잘못된 이미지.", "advice": "⚠️ 참고: 의사와 상담하십시오."},
-    "Italiano": {"dir": "ltr", "title": "IA Diagnostica Pelle", "btn": "🔍 Analizza", "upload": "📥 Carica", "cam": "📸 Camera", "invalid": "❌ Immagine non valida.", "advice": "⚠️ Nota: Consultare un medico."},
-    "اردو": {"dir": "rtl", "title": "جلد کی تشخیص کا نظام", "btn": "🔍 معائنہ کریں", "upload": "📥 اپلوڈ", "cam": "📸 کیمرہ", "invalid": "❌ تصویر درست نہیں۔", "advice": "⚠️ نوٹ: ڈاکٹر سے رجوع کریں۔"},
-    "فارسي": {"dir": "rtl", "title": "سیستم تشخیص هوشمند پوست", "btn": "🔍 شروع آنالیز", "upload": "📥 بارگذاری", "cam": "📸 دوربین", "invalid": "❌ تصویر معتبر نیست.", "advice": "⚠️ توجه: با پزشک مشورت کنید."},
-    "Tiếng Việt": {"dir": "ltr", "title": "Hệ thống AI Chẩn đoán Da", "btn": "🔍 Phân tích", "upload": "📥 Tải lên", "cam": "📸 Máy ảnh", "invalid": "❌ Ảnh không hợp lệ.", "advice": "⚠️ Lưu ý: Hãy gặp bác sĩ."},
-    "Bahasa Indonesia": {"dir": "ltr", "title": "Sistem AI Diagnosis Kulit", "btn": "🔍 Mulai", "upload": "📥 Unggah", "cam": "📸 Kamera", "invalid": "❌ Gambar tidak valid.", "advice": "⚠️ Catatan: Hubungi dokter."},
-    "Nederlands": {"dir": "ltr", "title": "Huid AI Diagnosesysteem", "btn": "🔍 Analyse", "upload": "📥 Uploaden", "cam": "📸 Camera", "invalid": "❌ Ongeldige foto.", "advice": "⚠️ Let op: Raadpleeg een arts."},
-    "Polski": {"dir": "ltr", "title": "System Diagnostyki Skóry AI", "btn": "🔍 Analizuj", "upload": "📥 Prześlij", "cam": "📸 Kamera", "invalid": "❌ Błędne zdjęcie.", "advice": "⚠️ Uwaga: Skonsultuj się z lekarzem."},
-    "Kurdî": {"dir": "rtl", "title": "سیستەمی ژیری دەستکردی پێست", "btn": "🔍 شیکاری", "upload": "📥 وێنە بنێرە", "cam": "📸 کامێرا", "invalid": "❌ وێنەکە هەڵەیە.", "advice": "⚠️ ئاگاداری: سەردانی پزیشک بکە."}
+    "العربية": {"dir": "rtl", "title": "نظام التشخيص العالمي الذكي للجلد", "upload": "📥 ارفع صورة", "cam": "📸 كاميرا", "btn": "🔍 تحليل الأنسجة", "invalid": "❌ الصورة لا تبدو فحصاً جلدياً.", "advice": "⚠️ تنبيه: استشر الطبيب فوراً."},
+    "English": {"dir": "ltr", "title": "Global AI Skin Diagnostic", "upload": "📥 Upload", "cam": "📸 Camera", "btn": "🔍 Analyze Tissue", "invalid": "❌ Invalid Image.", "advice": "⚠️ Note: Consult a doctor."},
+    "Français": {"dir": "ltr", "title": "Diagnostic Cutané IA", "upload": "📥 Charger", "cam": "📸 Caméra", "btn": "🔍 Analyser", "invalid": "❌ Invalide.", "advice": "⚠️ Consultez un médecin."},
+    "Español": {"dir": "ltr", "title": "IA Diagnóstico de Piel", "upload": "📥 Subir", "cam": "📸 Cámara", "btn": "🔍 Analizar", "invalid": "❌ Imagen inválida.", "advice": "⚠️ Consulte a un médico."},
+    "Deutsch": {"dir": "ltr", "title": "KI Hautdiagnose", "upload": "📥 Hochladen", "cam": "📸 Kamera", "btn": "🔍 Analyse", "invalid": "❌ Ungültig.", "advice": "⚠️ Arzt aufsuchen."},
+    "中文": {"dir": "ltr", "title": "皮肤人工智能诊断", "upload": "📥 上传", "cam": "📸 相机", "btn": "🔍 分析", "invalid": "❌ 无效图像。", "advice": "⚠️ 请咨询医生。"},
+    "हिन्दी": {"dir": "ltr", "title": "त्वचा एआई निदान", "upload": "📥 अपलोड", "cam": "📸 कैमरा", "btn": "🔍 विश्लेषण", "invalid": "❌ अमान्य।", "advice": "⚠️ डॉक्टर से मिलें।"},
+    "Русский": {"dir": "ltr", "title": "ИИ диагностика кожи", "upload": "📥 Загрузить", "cam": "📸 Камера", "btn": "🔍 Анализ", "invalid": "❌ Ошибка.", "advice": "⚠️ Обратитесь к врачу."},
+    "日本語": {"dir": "ltr", "title": "皮膚AI診断", "upload": "📥 アップロード", "cam": "📸 カメラ", "btn": "🔍 解析", "invalid": "❌ 無効。", "advice": "⚠️ 医師に相談。"},
+    "Português": {"dir": "ltr", "title": "IA Pele", "upload": "📥 Carregar", "cam": "📸 Câmera", "btn": "🔍 Analisar", "invalid": "❌ Inválido.", "advice": "⚠️ Consulte médico."},
+    "Türkçe": {"dir": "ltr", "title": "Cilt AI", "upload": "📥 Yükle", "cam": "📸 Kamera", "btn": "🔍 Analiz", "invalid": "❌ Geçersiz.", "advice": "⚠️ Doktora danışın."},
+    "한국어": {"dir": "ltr", "title": "피부 AI", "upload": "📥 업로드", "cam": "📸 카메라", "btn": "🔍 분석", "invalid": "❌ 무효.", "advice": "⚠️ 의사 상담."},
+    "Italiano": {"dir": "ltr", "title": "IA Pelle", "upload": "📥 Carica", "cam": "📸 Camera", "btn": "🔍 Analizza", "invalid": "❌ Invalido.", "advice": "⚠️ Consulti medico."},
+    "اردو": {"dir": "rtl", "title": "جلد کی تشخیص", "upload": "📥 اپلوڈ", "cam": "📸 کیمرہ", "btn": "🔍 معائنہ", "invalid": "❌ تصویر درست نہیں۔", "advice": "⚠️ ڈاکٹر سے ملیں۔"},
+    "فارسي": {"dir": "rtl", "title": "هوش مصنوعی پوست", "upload": "📥 بارگذاری", "cam": "📸 دوربین", "btn": "🔍 آنالیز", "invalid": "❌ نامعتبر.", "advice": "⚠️ پزشک بروید."},
+    "Tiếng Việt": {"dir": "ltr", "title": "AI Da liễu", "upload": "📥 Tải lên", "cam": "📸 Máy ảnh", "btn": "🔍 Phân tích", "invalid": "❌ Lỗi.", "advice": "⚠️ Gặp bác sĩ."},
+    "Bahasa Indonesia": {"dir": "ltr", "title": "AI Kulit", "upload": "📥 Unggah", "cam": "📸 Kamera", "btn": "🔍 Analisis", "invalid": "❌ Gagal.", "advice": "⚠️ Hubungi dokter."},
+    "Nederlands": {"dir": "ltr", "title": "Huid AI", "upload": "📥 Upload", "cam": "📸 Camera", "btn": "🔍 Analyse", "invalid": "❌ Ongeldig.", "advice": "⚠️ Raadpleeg arts."},
+    "Polski": {"dir": "ltr", "title": "AI Skóry", "upload": "📥 Prześlij", "cam": "📸 Kamera", "btn": "🔍 Analiza", "invalid": "❌ Błąd.", "advice": "⚠️ Idź do lekarza."},
+    "Kurdî": {"dir": "rtl", "title": "ژیری پێست", "upload": "📥 وێنە", "cam": "📸 کامێرا", "btn": "🔍 شیکاری", "invalid": "❌ هەڵە.", "advice": "⚠️ پزیشک ببینە."}
 }
 
-if 'lang' not in st.session_state: st.session_state.lang = "العربية"
-t = LANG_DATA[st.session_state.lang]
-
-# --- 3. الدليل الطبي الملون (10 أنواع) ---
-MEDICAL_TYPES = {
-    0: {"n": "Melanoma (ميلانوما)", "c": "#C0392B", "s": "🚨 خبيث جداً", "d": "أخطر أنواع سرطان الجلد، يتطلب تدخلاً طبياً فورياً."},
-    1: {"n": "Melanocytic Nevi (وحمة)", "c": "#27AE60", "s": "✅ حميد", "d": "شامات عادية ناتجة عن تجمع صبغي، آمنة غالباً."},
-    2: {"n": "Basal Cell Carcinoma", "c": "#E74C3C", "s": "🚨 خبيث", "d": "سرطان الخلايا القاعدية، ينمو ببطء ويحتاج فحصاً مختصاً."},
-    3: {"n": "Actinic Keratosis", "c": "#D35400", "s": "⚠️ ما قبل سرطاني", "d": "بقع خشنة ناتجة عن أضرار الشمس، قد تتحول لسرطان."},
-    4: {"n": "Benign Keratosis", "c": "#2ECC71", "s": "✅ حميد", "d": "زوائد جلدية غير سرطانية تظهر مع تقدم العمر."},
-    5: {"n": "Dermatofibroma", "c": "#16A085", "s": "✅ حميد", "d": "كتلة صلبة صغيرة تحت الجلد، غير ضارة تماماً."},
-    6: {"n": "Vascular Lesions", "c": "#8E44AD", "s": "✅ حميد", "d": "بقع ناتجة عن تجمع أوعية دموية."},
-    7: {"n": "Squamous Cell Carcinoma", "c": "#A93226", "s": "🚨 خبيث", "d": "ثاني أكثر أنواع سرطان الجلد شيوعاً."},
-    8: {"n": "Psoriasis (الصدفية)", "c": "#2980B9", "s": "🔍 حالة جلدية", "d": "مرض مناعي يسبب قشوراً وبقعاً حمراء."},
-    9: {"n": "Eczema (الأكزيما)", "c": "#F39C12", "s": "🔍 حالة جلدية", "d": "التهاب جلدي يسبب حكة وجفافاً غير سرطاني."}
+# --- 2. الدليل الطبي الملون (10 أنواع) ---
+MEDICAL_INFO = {
+    0: {"n": "Melanoma (ميلانوما)", "c": "#FF0000", "s": "🚨 خبيث جداً", "d": "أخطر أنواع سرطان الجلد، يتميز بعدم التماثل وتعدد الألوان."},
+    1: {"n": "Melanocytic Nevi (وحمة)", "c": "#27AE60", "s": "✅ حميد", "d": "شامات طبيعية آمنة، تظهر بشكل منتظم على الجلد."},
+    2: {"n": "Basal Cell Carcinoma (BCC)", "c": "#C0392B", "s": "🚨 خبيث", "d": "سرطان الخلايا القاعدية، ينمو ببطء ويظهر كقرحة لؤلؤية."},
+    3: {"n": "Actinic Keratosis (AK)", "c": "#E67E22", "s": "⚠️ ما قبل سرطاني", "d": "بقع خشنة ناتجة عن الشمس، قد تتحول لسرطان بمرور الوقت."},
+    4: {"n": "Benign Keratosis (BKL)", "c": "#2ECC71", "s": "✅ حميد", "d": "زوائد جلدية غير سرطانية تظهر مع تقدم العمر."},
+    5: {"n": "Dermatofibroma (DF)", "c": "#16A085", "s": "✅ حميد", "d": "كتلة صلبة صغيرة تظهر غالباً في الساقين بعد إصابة طفيفة."},
+    6: {"n": "Vascular Lesions (VASC)", "color": "#8E44AD", "s": "✅ حميد", "d": "آفات ناتجة عن تجمع الشعيرات الدموية."},
+    7: {"n": "Squamous Cell Carcinoma", "c": "#A93226", "s": "🚨 خبيث", "d": "سرطان الخلايا الحرشفية، يظهر كبقعة حمراء متقشرة."},
+    8: {"n": "Psoriasis (الصدفية)", "c": "#2980B9", "s": "🔍 حالة جلدية", "d": "مرض مناعي يسبب قشوراً فضية وبقعاً حمراء."},
+    9: {"n": "Eczema (الأكزيما)", "c": "#F39C12", "s": "🔍 حالة جلدية", "d": "التهاب جلدي يسبب جفافاً وحكة شديدة."}
 }
 
-# --- 4. المحركات البرمجية (الذكاء الاصطناعي) ---
+# --- 3. محركات الذكاء الاصطناعي ---
 @st.cache_resource
-def load_models():
-    # موديل الفلترة
-    filter_m = tf.keras.applications.MobileNetV2(weights="imagenet")
-    # موديل التشخيص الهجين
-    base1 = EfficientNetB0(weights=None, include_top=False, input_shape=(224, 224, 3))
-    base2 = MobileNetV2(weights=None, include_top=False, input_shape=(224, 224, 3))
-    comb = Concatenate()([GlobalAveragePooling2D()(base1.output), GlobalAveragePooling2D()(base2.output)])
+def load_engines():
+    # موديل فلترة الصور الخارجية
+    f_mod = tf.keras.applications.MobileNetV2(weights="imagenet")
+    # بناء الموديل الهجين الخاص بك (Ensemble)
+    b1 = EfficientNetB0(weights=None, include_top=False, input_shape=(224, 224, 3))
+    b2 = MobileNetV2(weights=None, include_top=False, input_shape=(224, 224, 3))
+    comb = Concatenate()([GlobalAveragePooling2D()(b1.output), GlobalAveragePooling2D()(b2.output)])
     out = Dense(7, activation='softmax')(Dropout(0.5)(Dense(512, activation='relu')(comb)))
-    diag_m = Model(inputs=[base1.input, base2.input], outputs=out)
-    try: diag_m.load_weights("skin_expert_master.h5")
-    except: pass
-    return filter_m, diag_m
+    d_mod = Model(inputs=[b1.input, b2.input], outputs=out)
+    try: d_mod.load_weights("skin_expert_master.h5")
+    except: st.error("Weights not found!")
+    return f_mod, d_mod
 
-f_model, d_model = load_models()
+filter_m, diag_m = load_engines()
 
-# --- 5. التنسيق والواجهة (CSS) ---
+# --- 4. واجهة المستخدم ---
+selected_lang = st.selectbox("🌐 Choose Language / اختر اللغة", list(LANG_DATA.keys()))
+t = LANG_DATA[selected_lang]
+
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
-    * {{ font-family: 'Tajawal', sans-serif; direction: {t['dir']}; }}
+    * {{ direction: {t['dir']}; font-family: 'Tajawal', sans-serif; }}
     .main-title {{ text-align: center; color: #0d47a1; font-size: 2.2em; font-weight: bold; padding: 15px; }}
-    .advice-box {{ background-color: #fff1f0; border: 1px solid #ffa39e; padding: 10px; border-radius: 8px; color: #cf1322; text-align: center; }}
-    .card {{ padding: 20px; border-radius: 15px; border: 4px solid; text-align: center; background: white; }}
 </style>
 """, unsafe_allow_html=True)
 
-# شريط اختيار اللغة العلوي
-cols = st.columns(10)
-for i, lang in enumerate(list(LANG_DATA.keys())[:10]):
-    if cols[i].button(lang, key=f"L1_{i}"):
-        st.session_state.lang = lang; st.rerun()
-cols2 = st.columns(10)
-for i, lang in enumerate(list(LANG_DATA.keys())[10:]):
-    if cols2[i].button(lang, key=f"L2_{i}"):
-        st.session_state.lang = lang; st.rerun()
-
 st.markdown(f"<div class='main-title'>{t['title']}</div>", unsafe_allow_html=True)
-st.markdown(f"<div class='advice-box'>{t['advice']}</div>", unsafe_allow_html=True)
+st.warning(t['advice'])
 
-# رفع الصورة
 col1, col2 = st.columns(2)
 with col1:
-    choice = st.radio("", [t['upload'], t['cam']], horizontal=True)
-    file = st.file_uploader("", type=["jpg", "png", "jpeg"]) if "ارفع" in choice or "Upload" in choice else st.camera_input("")
+    m = st.radio("", [t['upload'], t['cam']], horizontal=True)
+    file = st.file_uploader("", type=["jpg", "png", "jpeg"]) if "ارفع" in m or "Upload" in m else st.camera_input("")
 
 if file:
     img = Image.open(file).convert('RGB')
     with col2: st.image(img, use_container_width=True)
     
     if st.button(t['btn']):
-        # فحص محتوى الصورة
-        img_res = cv2.resize(np.array(img), (224, 224))
-        x_f = tf.keras.applications.mobilenet_v2.preprocess_input(np.expand_dims(img_res, axis=0))
-        f_pred = f_model.predict(x_f)
-        decoded = tf.keras.applications.mobilenet_v2.decode_predictions(f_pred, top=3)[0]
-        
-        # فلترة الصور الخارجية
-        is_skin = True
-        for _, label, score in decoded:
-            if any(forbidden in label.lower() for forbidden in ['car', 'dog', 'flower', 'screen']) and score > 0.3:
-                is_skin = False
-        
-        if not is_skin:
-            st.error(t['invalid'])
-        else:
-            # التشخيص
-            x_d = tf.keras.applications.efficientnet.preprocess_input(np.expand_dims(img_res, axis=0))
-            preds = d_model.predict([x_d, x_d])[0]
-            idx = np.argmax(preds)
-            res = MEDICAL_TYPES[idx]
+        with st.spinner("Processing..."):
+            img_np = np.array(img)
+            img_res = cv2.resize(img_np, (224, 224))
             
-            st.markdown(f"""
-            <div class="card" style="border-color: {res['c']}; color: {res['c']};">
-                <h2>{res['n']}</h2>
-                <h4>{res['s']}</h4>
-                <p style="color: #333;">{res['d']}</p>
-                <hr>
-                <h3>دقة الفحص: {preds[idx]*100:.1f}%</h3>
-            </div>
-            """, unsafe_allow_html=True)
+            # فلترة الصور الخارجية
+            xf = tf.keras.applications.mobilenet_v2.preprocess_input(np.expand_dims(img_res, axis=0))
+            f_preds = filter_m.predict(xf)
+            decoded = tf.keras.applications.mobilenet_v2.decode_predictions(f_preds, top=3)[0]
+            
+            is_skin = True
+            for _, label, score in decoded:
+                if any(x in label.lower() for x in ['car', 'wheel', 'dog', 'flower', 'screen']) and score > 0.3:
+                    is_skin = False
+            
+            if not is_skin:
+                st.error(t['invalid'])
+            else:
+                # تحسين الصورة لكسر انحياز "حميد"
+                lab = cv2.cvtColor(img_res, cv2.COLOR_RGB2LAB)
+                l, a, b = cv2.split(lab)
+                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                img_proc = cv2.merge((clahe.apply(l), a, b))
+                img_proc = cv2.cvtColor(img_proc, cv2.COLOR_LAB2RGB)
+                
+                # التشخيص
+                inp = tf.keras.applications.efficientnet.preprocess_input(np.expand_dims(img_proc, axis=0))
+                res_preds = diag_m.predict([inp, inp])[0]
+                idx = np.argmax(res_preds)
+                
+                # منع إظهار نتيجة خبيثة بنسبة ضئيلة جداً
+                conf = res_preds[idx]
+                info = MEDICAL_INFO[idx]
+                
+                st.markdown(f"""
+                <div style="padding:25px; border-radius:15px; border:6px solid {info.get('c', '#555')}; text-align:center; background:white;">
+                    <h2 style="color:{info.get('c', '#555')};">{info['n']}</h2>
+                    <h3>{info['s']}</h3>
+                    <hr>
+                    <h4>نسبة التأكد: {conf*100:.1f}%</h4>
+                </div>
+                """, unsafe_allow_html=True)
 
-# --- 6. عرض الدليل الطبي (10 أنواع) ---
+# --- 5. القائمة المنسدلة للدليل الطبي ---
 st.write("---")
-st.subheader("📚 الدليل الطبي الملون")
-d_cols = st.columns(2)
-for i, (k, v) in enumerate(MEDICAL_TYPES.items()):
-    with d_cols[i % 2]:
+st.subheader("📖 الدليل الطبي المرجعي")
+selected_info = st.selectbox("اختر نوع الإصابة لعرض تفاصيلها:", [v['n'] for v in MEDICAL_INFO.values()])
+
+for k, v in MEDICAL_INFO.items():
+    if v['n'] == selected_info:
         st.markdown(f"""
-        <div style="border-left: 8px solid {v['c']}; padding: 10px; background: {v['c']}10; margin-bottom: 10px; border-radius: 5px;">
-            <strong style="color: {v['c']};">{v['n']}</strong><br>
-            <small>{v['s']}</small><br>
-            <span>{v['d']}</span>
+        <div style="background-color:{v.get('c', '#ccc')}15; padding:20px; border-right:10px solid {v.get('c', '#ccc')}; border-radius:5px;">
+            <h3 style="color:{v.get('c', '#ccc')};">{v['n']}</h3>
+            <p><strong>التصنيف:</strong> {v['s']}</p>
+            <p><strong>التشخيص الطبي:</strong> {v['d']}</p>
         </div>
         """, unsafe_allow_html=True)
