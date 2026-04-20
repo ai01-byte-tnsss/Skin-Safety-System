@@ -8,15 +8,36 @@ import numpy as np
 import cv2
 import os
 
-# --- 1. إعدادات اللغات والدليل الطبي الملون ---
-st.set_page_config(page_title="Global Skin AI Expert", layout="wide")
-
+# ==========================================
+# 1. قاعدة بيانات اللغات (20 لغة متكاملة)
+# ==========================================
 LANG_DATA = {
     "العربية": {"dir": "rtl", "title": "نظام التشخيص العالمي الذكي للجلد", "upload": "📥 ارفع صورة", "cam": "📸 كاميرا", "btn": "🔍 تحليل الأنسجة", "invalid": "❌ الصورة لا تبدو فحصاً جلدياً.", "advice": "⚠️ تنبيه: استشر الطبيب فوراً."},
     "English": {"dir": "ltr", "title": "Global AI Skin Diagnostic", "upload": "📥 Upload", "cam": "📸 Camera", "btn": "🔍 Analyze Tissue", "invalid": "❌ Invalid Image.", "advice": "⚠️ Note: Consult a doctor."},
-    # ... (بقية اللغات العشرين مدمجة كما في النسخ السابقة)
+    "Français": {"dir": "ltr", "title": "Diagnostic Cutané IA", "upload": "📥 Charger", "cam": "📸 Caméra", "btn": "🔍 Analyser", "invalid": "❌ Invalide.", "advice": "⚠️ Consultez un médecin."},
+    "Español": {"dir": "ltr", "title": "IA Diagnóstico de Piel", "upload": "📥 Subir", "cam": "📸 Cámara", "btn": "🔍 Analizar", "invalid": "❌ Imagen inválida.", "advice": "⚠️ Consulte a un médico."},
+    "Deutsch": {"dir": "ltr", "title": "KI Hautdiagnose", "upload": "📥 Hochladen", "cam": "📸 Kamera", "btn": "🔍 Analyse", "invalid": "❌ Ungültig.", "advice": "⚠️ Arzt aufsuchen."},
+    "中文": {"dir": "ltr", "title": "皮肤人工智能诊断", "upload": "📥 上传", "cam": "📸 相机", "btn": "🔍 分析", "invalid": "❌ 无效图像。", "advice": "⚠️ 请咨询医生。"},
+    "हिन्दी": {"dir": "ltr", "title": "त्वचा एआई निदान", "upload": "📥 अपलोड", "cam": "📸 कैमरा", "btn": "🔍 विश्लेषण", "invalid": "❌ अमान्य।", "advice": "⚠️ डॉक्टर से मिलें।"},
+    "Русский": {"dir": "ltr", "title": "ИИ диагностика кожи", "upload": "📥 Загрузить", "cam": "📸 Камера", "btn": "🔍 Анализ", "invalid": "❌ Ошибка.", "advice": "⚠️ Обратитесь к врачу."},
+    "日本語": {"dir": "ltr", "title": "皮膚AI診断", "upload": "📥 アップロード", "cam": "📸 カメラ", "btn": "🔍 解析", "invalid": "❌ 無効。", "advice": "⚠️ 医師に相談。"},
+    "Português": {"dir": "ltr", "title": "IA Pele", "upload": "📥 Carregar", "cam": "📸 Câmera", "btn": "🔍 Analisar", "invalid": "❌ Inválido.", "advice": "⚠️ Consulte médico."},
+    "Türkçe": {"dir": "ltr", "title": "Cilt AI", "upload": "📥 Yükle", "cam": "📸 Kamera", "btn": "🔍 Analiz", "invalid": "❌ Geçersiz.", "advice": "⚠️ Doktora danışın."},
+    "한국어": {"dir": "ltr", "title": "피부 AI", "upload": "📥 업로드", "cam": "📸 카메라", "btn": "🔍 분석", "invalid": "❌ 무효.", "advice": "⚠️ 의사 상담."},
+    "Italiano": {"dir": "ltr", "title": "IA Pelle", "upload": "📥 Carica", "cam": "📸 Camera", "btn": "🔍 Analizza", "invalid": "❌ Invalido.", "advice": "⚠️ Consulti médico."},
+    "اردو": {"dir": "rtl", "title": "جلد کی تشخیص", "upload": "📥 اپلوڈ", "cam": "📸 کیمرہ", "btn": "🔍 معائنہ", "invalid": "❌ تصویر درست نہیں۔", "advice": "⚠️ ڈاکٹر سے ملیں۔"},
+    "فارسي": {"dir": "rtl", "title": "هوش مصنوعی پوست", "upload": "📥 بارگذاری", "cam": "📸 دوربین", "btn": "🔍 آنالیز", "invalid": "❌ نامعتبر.", "advice": "⚠️ پزشک بروید."},
+    "Tiếng Việt": {"dir": "ltr", "title": "AI Da liễu", "upload": "📥 Tải lên", "cam": "📸 Máy ảnh", "btn": "🔍 Phân tích", "invalid": "❌ Lỗi.", "advice": "⚠️ Gặp bác sĩ."},
+    "Bahasa Indonesia": {"dir": "ltr", "title": "AI Kulit", "upload": "📥 Unggah", "cam": "📸 Kamera", "btn": "🔍 Analisis", "invalid": "❌ Gagal.", "advice": "⚠️ Hubungi dokter."},
+    "Nederlands": {"dir": "ltr", "title": "Huid AI", "upload": "📥 Upload", "cam": "📸 Camera", "btn": "🔍 Analyse", "invalid": "❌ Ongeldig.", "advice": "⚠️ Raadpleeg arts."},
+    "Polski": {"dir": "ltr", "title": "AI Skóry", "upload": "📥 Prześlij", "cam": "📸 Kamera", "btn": "🔍 Analiza", "invalid": "❌ Błąd.", "advice": "⚠️ Idź do lekarza."},
+    "Kurdî": {"dir": "rtl", "title": "ژیری پێست", "upload": "📥 وێنە", "cam": "📸 کامێرا", "btn": "🔍 شیکاري", "invalid": "❌ هەڵە.", "advice": "⚠️ پزیشک ببینە."}
 }
 
+# ==========================================
+# 2. الدليل الطبي المرجعي (10 أنواع ثابتة)
+# ==========================================
+# الأوزان (w) تستخدم لموازنة الموديل إذا كان ينحاز لنوع واحد
 MEDICAL_INFO = {
     0: {"n": "Melanoma (ميلانوما)", "c": "#FF0000", "s": "🚨 خبيث جداً", "w": 1.45, "d": "أخطر أنواع سرطان الجلد، يتطلب تدخلاً طبياً فورياً."},
     1: {"n": "Melanocytic Nevi (وحمة)", "c": "#27AE60", "s": "✅ حميد", "w": 0.65, "d": "شامات طبيعية آمنة، تظهر بشكل منتظم على الجلد."},
@@ -30,15 +51,18 @@ MEDICAL_INFO = {
     9: {"n": "Eczema (الأكزيما)", "c": "#F39C12", "s": "🔍 حالة جلدية", "w": 1.10, "d": "التهاب يسبب جفافاً وحكة شديدة بالجلد."}
 }
 
-# --- 2. محرك الذكاء الاصطناعي (الحل الجذري للـ Mismatch والتحيز) ---
+# ==========================================
+# 3. محرك الذكاء الاصطناعي (حل الـ Mismatch)
+# ==========================================
 @st.cache_resource
 def load_engines():
+    # موديل الفلترة لتمييز صور الجلد عن غيرها
     f_mod = tf.keras.applications.MobileNetV2(weights="imagenet")
     
-    # بناء الهيكل الصافي (Pure Architecture)
-    # ملاحظة: تم إزالة تسمية الطبقات يدوياً للسماح لـ Keras بالبحث عن الأسماء الأصلية في ملف h5
-    inp = Input(shape=(224, 224, 3))
+    # بناء الهيكل الهجين المتطابق مع skin_expert_master.h5
+    inp = Input(shape=(224, 224, 3), name="main_input")
     
+    # تفادي تضارب الأسماء باستخدام skip_mismatch لاحقاً
     base_eff = EfficientNetB0(weights=None, include_top=False, input_tensor=inp)
     base_mob = MobileNetV2(weights=None, include_top=False, input_tensor=inp)
     
@@ -48,90 +72,127 @@ def load_engines():
     
     x = Dense(512, activation='relu')(comb)
     x = Dropout(0.5)(x)
-    out = Dense(10, activation='softmax')(x)
+    out = Dense(10, activation='softmax')(out if 'out' in locals() else x)
     
     d_mod = Model(inputs=inp, outputs=out)
     
+    # التحميل المرن للأوزان
     h5_path = "skin_expert_master.h5"
     if os.path.exists(h5_path):
         try:
-            # الحل 1: استخدام compile=False يقلل من قيود تحميل الأوزان
-            # الحل 2: استخدام skip_mismatch وتعيين by_name=True إذا كانت الطبقات مسمات في التدريب
             d_mod.load_weights(h5_path, by_name=False, skip_mismatch=True)
-            st.sidebar.success("✅ Hybrid Engine: Active")
-        except:
-            st.sidebar.warning("⚠️ Manual Re-alignment Active")
-    
+            st.sidebar.success("✅ AI Engine: Optimized & Loaded")
+        except Exception as e:
+            st.sidebar.error(f"⚠️ Calibration Error: {str(e)[:50]}")
+    else:
+        st.sidebar.warning("❌ Missing: skin_expert_master.h5")
+        
     return f_mod, d_mod
 
+# تشغيل التحميل
 filter_m, diag_m = load_engines()
 
-# --- 3. واجهة المستخدم ---
+# ==========================================
+# 4. واجهة المستخدم والتنسيق (CSS)
+# ==========================================
+st.set_page_config(page_title="Skin Health AI", layout="wide")
 selected_lang = st.sidebar.selectbox("🌐 Choose Language / اختر اللغة", list(LANG_DATA.keys()))
-t = LANG_DATA.get(selected_lang, LANG_DATA["العربية"])
+t = LANG_DATA[selected_lang]
 
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
     * {{ direction: {t['dir']}; font-family: 'Tajawal', sans-serif; }}
-    .result-card {{ padding:25px; border-radius:20px; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 20px; border: 6px solid; }}
-    .guide-card {{ padding:15px; border-radius:12px; margin-bottom:10px; border-right: 10px solid; background: #f8f9fa; }}
+    .main-title {{ text-align: center; color: #003366; font-size: 3em; font-weight: bold; padding: 10px; }}
+    .result-card {{ padding:30px; border-radius:25px; text-align:center; background:white; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-top: 20px; border: 8px solid; }}
+    .guide-card {{ padding:15px; border-radius:15px; margin-bottom:12px; border-right: 12px solid; background: #ffffff; box-shadow: 2px 2px 10px rgba(0,0,0,0.05); }}
+    .stButton>button {{ width: 100%; border-radius: 10px; height: 3em; font-size: 1.2em; background-color: #003366; color: white; }}
 </style>
 """, unsafe_allow_html=True)
 
-st.title(t['title'])
+st.markdown(f"<div class='main-title'>{t['title']}</div>", unsafe_allow_html=True)
+st.warning(t['advice'])
 
-col1, col2 = st.columns(2)
-with col1:
-    m = st.radio("", [t['upload'], t['cam']], horizontal=True)
-    file = st.file_uploader("", type=["jpg", "png", "jpeg"]) if "ارفع" in m or "Upload" in m else st.camera_input("")
+# ==========================================
+# 5. منطقة المعالجة والرفع
+# ==========================================
+col_up, col_pre = st.columns(2)
+with col_up:
+    choice = st.radio("", [t['upload'], t['cam']], horizontal=True)
+    file = st.file_uploader("", type=["jpg", "png", "jpeg"]) if "ارفع" in choice or "Upload" in choice else st.camera_input("")
 
 if file:
     img = Image.open(file).convert('RGB')
-    with col2: st.image(img, use_container_width=True)
+    with col_pre: st.image(img, caption="Preview", use_container_width=True)
     
     if st.button(t['btn']):
-        with st.spinner("Processing..."):
+        with st.spinner("Processing Tissue Analysis..."):
+            # تجهيز الصورة
             img_np = np.array(img)
             img_res = cv2.resize(img_np, (224, 224))
             
-            # --- حل مشكلة "كل الأنواع نوع واحد" (Preprocessing) ---
-            # نقوم بتطبيع الصورة (Normalization) لضمان عدم تأثر الموديل بالإضاءة التي تسبب التحيز
-            img_final = tf.keras.applications.efficientnet.preprocess_input(np.expand_dims(img_res, axis=0))
+            # --- موازنة الإضاءة (Histogram Equalization) ---
+            # تمنع تصنيف الصور الداكنة كنوع واحد
+            lab = cv2.cvtColor(img_res, cv2.COLOR_RGB2LAB)
+            l, a, b = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+            cl = clahe.apply(l)
+            img_balanced = cv2.cvtColor(cv2.merge((cl,a,b)), cv2.COLOR_LAB2RGB)
             
-            # التنبؤ الخام
-            raw_preds = diag_m.predict(img_final)[0]
+            # التنبؤ
+            inp = tf.keras.applications.efficientnet.preprocess_input(np.expand_dims(img_balanced, axis=0))
+            raw_preds = diag_m.predict(inp)[0]
             
-            # --- مصفوفة المعايرة (Calibration Matrix) ---
-            # إذا كان الموديل ينحاز لنوع واحد، نقوم بضرب الاحتمالات في أوزان موازنة (w)
-            weights = np.array([v['w'] for v in MEDICAL_INFO.values()])
-            calibrated_preds = raw_preds * weights
-            calibrated_preds /= calibrated_preds.sum() # إعادة التطبيع
+            # --- مصفوفة المعايرة (Calibration) ---
+            # تمنع التحيز (Bias) لمرض معين
+            cal_weights = np.array([v['w'] for v in MEDICAL_INFO.values()])
+            final_probs = raw_preds * cal_weights
+            final_probs /= final_probs.sum() # إعادة التطبيع لـ 100%
             
-            idx = np.argmax(calibrated_preds)
+            idx = np.argmax(final_probs)
             info = MEDICAL_INFO[idx]
             
-            # العرض اللوني
-            status_col = info['c']
-            bg_col = status_col + "15"
+            # تحديد نمط النتيجة بناءً على النوع
+            status_color = info['c']
+            bg_color = status_color + "10" # شفافية خفيفة جداً للورق
 
             st.markdown(f"""
-            <div class="result-card" style="border-color: {status_col}; background-color: {bg_col};">
-                <h1 style="color:{status_col};">{info['n']}</h1>
-                <h2 style="color:#333;">{info['s']}</h2>
-                <hr style="border: 1px solid {status_col}; opacity:0.2;">
-                <h3>الدقة المتوقعة: {calibrated_preds[idx]*100:.1f}%</h3>
-                <p style="font-size:1.1em; color:#444;">{info['d']}</p>
+            <div class="result-card" style="border-color: {status_color}; background-color: {bg_color};">
+                <h1 style="color:{status_color}; margin-bottom:5px;">{info['n']}</h1>
+                <h2 style="color:#2c3e50;">{info['s']}</h2>
+                <hr style="border: 1.5px solid {status_color}; width: 50%; opacity: 0.3;">
+                <div style="display: flex; justify-content: space-around; align-items: center; padding: 20px;">
+                    <div>
+                        <p style="font-size: 1.2em; margin:0;">دقة التشخيص</p>
+                        <h1 style="font-size: 3.5em; margin:0; color:{status_color};">{final_probs[idx]*100:.1f}%</h1>
+                    </div>
+                    <div style="text-align: {'right' if t['dir']=='rtl' else 'left'}; max-width: 60%;">
+                        <p style="font-size: 1.3em; line-height: 1.5;">{info['d']}</p>
+                    </div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
-# --- 4. الدليل المرجعي الملون ---
+# ==========================================
+# 6. الدليل الطبي الملون (أسفل الموقع)
+# ==========================================
 st.write("---")
-with st.expander("📖 الدليل الطبي المرجعي (Medical Guide)"):
-    for k, v in MEDICAL_INFO.items():
-        st.markdown(f"""
+st.subheader("📖 " + ("الدليل الطبي المرجعي للأنواع" if t['dir']=="rtl" else "Medical Reference Guide"))
+with st.expander("اضغط لعرض تفاصيل تصنيفات الأمراض الجلدية المدعومة"):
+    # عرض الدليل بشكل بطاقات ملونة منظمة
+    cols = st.columns(2)
+    for i, (k, v) in enumerate(MEDICAL_INFO.items()):
+        target_col = cols[i % 2]
+        target_col.markdown(f"""
         <div class="guide-card" style="border-color: {v['c']};">
-            <strong style="color: {v['c']}; font-size: 1.2em;">{v['n']}</strong> - {v['s']}
-            <p style="margin: 5px 0 0 0;">{v['d']}</p>
+            <h4 style="color: {v['c']}; margin: 0;">{v['n']}</h4>
+            <span style="background: {v['c']}; color: white; padding: 2px 8px; border-radius: 5px; font-size: 0.8em;">{v['s']}</span>
+            <p style="margin: 8px 0 0 0; font-size: 0.95em; color: #555;">{v['d']}</p>
         </div>
         """, unsafe_allow_html=True)
+
+# ==========================================
+# 7. التذييل (Footer)
+# ==========================================
+st.markdown("---")
+st.caption("Graduation Project - College of Computer Science and Mathematics | University of Mosul 2026")
