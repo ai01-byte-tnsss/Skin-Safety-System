@@ -8,7 +8,7 @@ import numpy as np
 import cv2
 import os
 
-# --- 1. قاعدة بيانات اللغات (20 لغة كاملة) ---
+# --- 1. قاعدة بيانات اللغات (20 لغة) ---
 st.set_page_config(page_title="Global Skin AI Expert", layout="wide")
 
 LANG_DATA = {
@@ -48,7 +48,7 @@ MEDICAL_INFO = {
     9: {"n": "Eczema (الأكزيما)", "c": "#F39C12", "s": "🔍 حالة جلدية", "w": 1.10, "d": "التهاب يسبب جفافاً وحكة شديدة بالجلد."}
 }
 
-# --- 3. محرك الذكاء الاصطناعي (تعديل Mismatch المرن) ---
+# --- 3. محرك الذكاء الاصطناعي (مع حل مشكلة Mismatch) ---
 @st.cache_resource
 def load_engines():
     f_mod = tf.keras.applications.MobileNetV2(weights="imagenet")
@@ -73,10 +73,11 @@ def load_engines():
     h5_path = "skin_expert_master.h5"
     if os.path.exists(h5_path):
         try:
+            # الحل: استخدام skip_mismatch لتجنب توقف التطبيق عند وجود اختلاف في الأوزان
             d_mod.load_weights(h5_path, by_name=False, skip_mismatch=True)
-            st.sidebar.success("✅ Weights Loaded (Flexible)")
+            st.sidebar.success("✅ Weights Loaded (Flexible Mode)")
         except Exception as e:
-            st.sidebar.error(f"⚠️ Load Error: {str(e)[:50]}")
+            st.sidebar.error(f"⚠️ Weights Error: {str(e)[:50]}")
     else:
         st.sidebar.warning("❌ Missing .h5 File")
     return f_mod, d_mod
@@ -93,7 +94,7 @@ st.markdown(f"""
     * {{ direction: {t['dir']}; font-family: 'Tajawal', sans-serif; text-align: {'right' if t['dir']=='rtl' else 'left'}; }}
     .main-title {{ text-align: center; color: #1a237e; font-size: 2.5em; font-weight: bold; padding: 20px; }}
     .result-card {{ padding:25px; border-radius:20px; text-align:center; background:white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 20px; }}
-    .guide-card {{ padding:15px; border-radius:12px; margin-bottom:10px; border-right: 8px solid; }}
+    .guide-card {{ padding:15px; border-radius:12px; margin-bottom:10px; border-right: 10px solid; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -114,6 +115,7 @@ if file:
             img_np = np.array(img)
             img_res = cv2.resize(img_np, (224, 224))
             
+            # تحسين الصورة
             avg = np.mean(img_res)
             proc = img_res.astype(np.float32)
             for i in range(3):
@@ -124,9 +126,11 @@ if file:
             clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
             img_final = cv2.cvtColor(cv2.merge((clahe.apply(l), a, b)), cv2.COLOR_LAB2RGB)
             
+            # التنبؤ
             inp_tensor = tf.keras.applications.efficientnet.preprocess_input(np.expand_dims(img_final, axis=0))
             raw_preds = diag_m.predict(inp_tensor)[0]
             
+            # المعايرة
             cal_w = np.array([v['w'] for v in MEDICAL_INFO.values()])
             calibrated_preds = raw_preds * cal_w
             calibrated_preds /= calibrated_preds.sum() 
@@ -147,16 +151,15 @@ if file:
             </div>
             """, unsafe_allow_html=True)
 
-# --- 5. الدليل المرجعي الملون ---
+# --- 5. الدليل الطبي الملون ---
 st.write("---")
-st.subheader("📖 " + ("الدليل الطبي المرجعي" if selected_lang == "العربية" else "Medical Reference Guide"))
-with st.expander("اضغط لعرض كافة أنواع الإصابات الجلدية وتصنيفاتها"):
+st.subheader("📖 الدليل الطبي المرجعي")
+with st.expander("اضغط لعرض تصنيفات الأمراض الجلدية المدعومة"):
     for k, v in MEDICAL_INFO.items():
-        # إنشاء بطاقة ملونة لكل مرض في الدليل
         st.markdown(f"""
         <div class="guide-card" style="border-color: {v['c']}; background-color: {v['c']}10;">
-            <strong style="color: {v['c']}; font-size: 1.2em;">{v['n']}</strong> 
-            <span style="background: {v['c']}; color: white; padding: 2px 8px; border-radius: 5px; font-size: 0.8em; margin: 0 10px;">{v['s']}</span>
-            <p style="margin-top: 5px; color: #444;">{v['d']}</p>
+            <strong style="color: {v['c']}; font-size: 1.25em;">{v['n']}</strong> 
+            <span style="background: {v['c']}; color: white; padding: 3px 10px; border-radius: 6px; font-size: 0.85em; margin: 0 10px;">{v['s']}</span>
+            <p style="margin-top: 8px; color: #333; line-height: 1.4;">{v['d']}</p>
         </div>
         """, unsafe_allow_html=True)
