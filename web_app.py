@@ -150,7 +150,7 @@ if file:
 
 # --- 5. الدليل الطبي المرجعي الثابت (في أسفل الصفحة) ---
 st.write("---")
-st.subheader("📖 " + ("الدليل المرجعي" if selected_lang == "العربية" else "Medical Reference Guide"))
+st.subheader("📖 " + ("الدليل الطبي" if selected_lang == "العربية" else "Medical Reference Guide"))
 with st.expander("اضغط لعرض كافة أنواع الإصابات الجلدية المدعومة"):
     for k, v in MEDICAL_INFO.items():
         st.markdown(f"**{v['n']}** | {v['s']}  \n*{v['d']}*")
