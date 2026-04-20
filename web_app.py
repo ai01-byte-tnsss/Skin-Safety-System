@@ -8,120 +8,185 @@ import numpy as np
 import cv2
 import os
 
-# --- 1. الإعدادات واللغات الثابتة ---
-st.set_page_config(page_title="Skin AI System", layout="wide")
+# --- 1. إعدادات الصفحة العامة ---
+st.set_page_config(page_title="Skin AI System - نظام فحص الجلد", layout="wide")
 
-LANG_DATA = {
-    "العربية": {"dir": "rtl", "title": "نظام الفحص الذكي للجلد", "upload": "📥 ارفع صورة", "cam": "📸 كاميرا", "btn": "🔍 بدء الفحص", "invalid": "❌ عذراً، الصورة ليست فحصاً جلدياً.", "advice": "⚠️ تنبيه: هذا النظام أداة برمجية استرشادية فقط وليس بديلاً عن الطبيب المختص."},
-    "English": {"dir": "ltr", "title": "Skin AI Diagnostic System", "upload": "📥 Upload", "cam": "📸 Camera", "btn": "🔍 Start Analysis", "invalid": "❌ Invalid skin image.", "advice": "⚠️ Note: This system is a guidance tool and not a substitute for a professional doctor."},
-    "Kurdî": {"dir": "rtl", "title": "ژیری پێست", "upload": "📥 وێنە", "cam": "📸 کامێرا", "btn": "🔍 شیکاری", "invalid": "❌ هەڵە.", "advice": "⚠️ ئاگاداري: جێگرەوەی پزیشک نییە."}
+# --- 2. تعريف اللغات العشر الأساسية ---
+LANGS_CONFIG = {
+    "العربية": "rtl",
+    "English": "ltr",
+    "Français": "ltr",
+    "Deutsch": "ltr",
+    "Español": "ltr",
+    "Türkçe": "ltr",
+    "Русский": "ltr",
+    "中文": "ltr",
+    "हिन्दी": "ltr",
+    "Kurdî": "rtl"
 }
 
-# --- 2. الدليل الطبي المرجعي (10 أنواع) ---
-MEDICAL_INFO = {
-    0: {"n": "Melanoma (ميلانوما)", "c": "#FF3B30", "s": "🚨 خبيث جداً", "d": "أخطر أنواع سرطان الجلد، يتطلب فحصاً طبياً فورياً."},
-    1: {"n": "Melanocytic Nevi (وحمة صبغية)", "c": "#34C759", "s": "✅ حميد", "d": "شامة طبيعية، آمنة ومستقرة في أغلب الحالات."},
-    2: {"n": "Basal Cell Carcinoma (BCC)", "c": "#FF9500", "s": "🚨 خبيث", "d": "سرطان الخلايا القاعدية، ينمو ببطء ويجب استئصاله."},
-    3: {"n": "Actinic Keratosis (AK)", "c": "#AF52DE", "s": "⚠️ ما قبل سرطاني", "d": "بقع ناتجة عن الشمس قد تتطور لسرطان مستقبلاً."},
-    4: {"n": "Benign Keratosis (BKL)", "c": "#5856D6", "s": "✅ حميد", "d": "زوائد جلدية غير سرطانية تظهر مع تقدم العمر."},
-    5: {"n": "Dermatofibroma (DF)", "c": "#007AFF", "s": "✅ حميد", "d": "كتلة صلبة صغيرة، غير ضارة تماماً."},
-    6: {"n": "Vascular Lesions (VASC)", "c": "#5AC8FA", "s": "✅ حميد", "d": "آفات وعائية ناتجة عن تجمع الشعيرات الدموية."},
-    7: {"n": "Squamous Cell Carcinoma", "c": "#FF2D55", "s": "🚨 خبيث", "d": "سرطان الخلايا الحرشفية، يتطلب تدخلاً طبياً مختصاً."},
-    8: {"n": "Psoriasis (الصدفية)", "c": "#4CD964", "s": "🔍 حالة جلدية", "d": "مرض مناعي يسبب قشور فضية وبقع حمراء."},
-    9: {"n": "Eczema (الأكزيما)", "c": "#FFCC00", "s": "🔍 حالة جلدية", "d": "التهاب جلدي يسبب حكة واحمرار وجفاف."}
+# نصوص واجهة المستخدم حسب اللغة المختارة
+UI_LABELS = {
+    "العربية": {
+        "title": "نظام الفحص الذكي للجلد",
+        "upload": "📥 ارفع صورة الفحص أو استخدم الكاميرا",
+        "btn": "🔍 بدء تحليل الصورة",
+        "advice": "⚠️ تنبيه طبي: هذا النظام أداة برمجية استرشادية تعتمد على الذكاء الاصطناعي، ولا يغني عن زيارة الطبيب المختص.",
+        "guide_title": "📖 الدليل الطبي المرجعي لآفات الجلد",
+        "invalid": "❌ الصورة المرفوعة لا تبدو كفحص جلدي، يرجى التأكد من الصورة."
+    },
+    "English": {
+        "title": "Skin AI Diagnostic System",
+        "upload": "📥 Upload scan or use camera",
+        "btn": "🔍 Start Analysis",
+        "advice": "⚠️ Medical Note: This AI tool is for guidance only and is not a substitute for a doctor.",
+        "guide_title": "📖 Medical Reference Guide for Skin Lesions",
+        "invalid": "❌ The image does not appear to be a skin scan."
+    }
 }
 
-# --- 3. تحميل المحركات والذكاء الاصطناعي (تم الإصلاح الجذري هنا) ---
+# --- 3. بيانات التصنيف (لربط مخرجات الموديل بكلمة حميد/خبيث) ---
+DIAGNOSIS_MAP = {
+    0: {"status": "خبيث", "color": "#FF3B30"}, # Melanoma
+    1: {"status": "حميد", "color": "#34C759"}, # Melanocytic Nevi
+    2: {"status": "خبيث", "color": "#FF3B30"}, # Basal Cell Carcinoma
+    3: {"status": "خبيث", "color": "#FF9500"}, # Actinic Keratosis
+    4: {"status": "حميد", "color": "#34C759"}, # Benign Keratosis
+    5: {"status": "حميد", "color": "#34C759"}, # Dermatofibroma
+    6: {"status": "حميد", "color": "#34C759"}, # Vascular Lesions
+    7: {"status": "خبيث", "color": "#FF3B30"}, # Squamous Cell Carcinoma
+    8: {"status": "حميد", "color": "#34C759"}, # Psoriasis
+    9: {"status": "حميد", "color": "#34C759"}  # Eczema
+}
+
+# --- 4. الدليل الطبي الملون (10 أنواع منفصلة للعرض فقط) ---
+GUIDE_CONTENT = {
+    "Melanoma (ميلانوما)": {"color": "#FF3B30", "desc": "أخطر أنواع سرطان الجلد، يظهر عادةً كشامة غير منتظمة الشكل أو اللون وتنمو بسرعة."},
+    "Basal Cell (خلايا قاعدية)": {"color": "#FF9500", "desc": "أكثر أنواع سرطان الجلد شيوعاً، ينمو ببطء ونادراً ما ينتشر، لكنه يتطلب علاجاً."},
+    "Squamous Cell (خلايا حرشفية)": {"color": "#FF2D55", "desc": "ثاني أكثر الأنواع شيوعاً، يظهر كبقع حمراء قشرية أو قروح مفتوحة."},
+    "Actinic Keratosis (تقران شمسي)": {"color": "#AF52DE", "desc": "بقع خشنة ناتجة عن التعرض المفرط للشمس، وتعتبر مرحلة ما قبل سرطانية."},
+    "Nevi (الشامات)": {"color": "#34C759", "desc": "تجمعات صبغية طبيعية تظهر على الجلد، وتكون حميدة في الغالبية العظمى من الحالات."},
+    "Benign Keratosis (تقران حميد)": {"color": "#5856D6", "desc": "زوائد جلدية غير سرطانية تظهر عادةً مع التقدم في السن وتكون ذات ملمس شمعي."},
+    "Dermatofibroma (ليفي جلدي)": {"color": "#007AFF", "desc": "نمو حميد صغير وصلب يظهر غالباً بعد إصابة بسيطة أو لدغة حشرة."},
+    "Vascular Lesions (آفات وعائية)": {"color": "#5AC8FA", "desc": "تشمل الوحمات الدموية والنقاط الحمراء الناتجة عن تجمع الشعيرات الدموية."},
+    "Psoriasis (الصدفية)": {"color": "#4CD964", "desc": "مرض جلدي مزمن يسبب بقعاً حمراء مغطاة بقشور فضية نتيجة تسارع نمو الخلايا."},
+    "Eczema (الأكزيما)": {"color": "#FFCC00", "desc": "التهاب جلدي يسبب حكة شديدة واحمراراً، وغالباً ما يرتبط بالحساسية أو العوامل الوراثية."}
+}
+
+# --- 5. تحميل النماذج الذكية ---
 @st.cache_resource
-def load_full_system():
-    # موديل الفلترة (MobileNetV2 الأصلي)
-    f_mod = tf.keras.applications.MobileNetV2(weights="imagenet")
+def load_ai_models():
+    # موديل التحقق من نوع الصورة (فلترة)
+    filter_net = tf.keras.applications.MobileNetV2(weights="imagenet")
     
-    # بناء الموديل الهجين بمدخل واحد لتجنب خطأ ValueError
-    shared_input = Input(shape=(224, 224, 3))
+    # بناء الموديل الهجين للتشخيص
+    input_layer = Input(shape=(224, 224, 3))
+    branch1 = EfficientNetB0(weights=None, include_top=False)(input_layer)
+    branch2 = MobileNetV2(weights=None, include_top=False)(input_layer)
     
-    b1 = EfficientNetB0(weights=None, include_top=False)(shared_input)
-    b2 = MobileNetV2(weights=None, include_top=False)(shared_input)
+    merged = Concatenate()([GlobalAveragePooling2D()(branch1), GlobalAveragePooling2D()(branch2)])
+    dense1 = Dense(512, activation='relu')(merged)
+    dropout = Dropout(0.4)(dense1)
+    output_layer = Dense(10, activation='softmax')(dropout)
     
-    comb = Concatenate()([GlobalAveragePooling2D()(b1), GlobalAveragePooling2D()(b2)])
-    # تأكد أن المخرج يطابق عدد الأصناف في ملف skin_expert_master.h5 (سواء كان 7 أو 10)
-    out = Dense(10, activation='softmax')(Dropout(0.4)(Dense(512, activation='relu')(comb)))
+    diagnostic_model = Model(inputs=input_layer, outputs=output_layer)
     
-    d_mod = Model(inputs=shared_input, outputs=out)
-    
-    h5_path = "skin_expert_master.h5"
-    if os.path.exists(h5_path):
+    # تحميل الأوزان إذا كان الملف موجوداً
+    weights_path = "skin_expert_master.h5"
+    if os.path.exists(weights_path):
         try:
-            d_mod.load_weights(h5_path)
+            diagnostic_model.load_weights(weights_path)
         except:
-            st.error("⚠️ تنبيه: ملف الأوزان لا يتوافق مع عدد الأصناف الحالي (10).")
+            pass
             
-    return f_mod, d_mod
+    return filter_net, diagnostic_model
 
-filter_m, diag_m = load_full_system()
+filter_model, diag_model = load_ai_models()
 
-# --- 4. واجهة المستخدم ---
-selected_lang = st.selectbox("🌐 Choose Language / اختر اللغة", list(LANG_DATA.keys()))
-t = LANG_DATA[selected_lang]
+# --- 6. بناء واجهة المستخدم ---
+st.sidebar.markdown("### 🌐 ضبط اللغة / Settings")
+selected_language = st.sidebar.selectbox("اختر اللغة المعتمدة للواجهة:", list(LANGS_CONFIG.keys()))
+current_dir = LANGS_CONFIG[selected_language]
 
-st.markdown(f"<h1 style='text-align:center; color:#1E3A8A;'>{t['title']}</h1>", unsafe_allow_html=True)
-st.warning(t['advice'])
+# جلب النصوص بناءً على اللغة (الافتراضي إنجليزي إذا لم تتوفر ترجمة للعربية)
+labels = UI_LABELS.get(selected_language, UI_LABELS["English"])
 
-c1, c2 = st.columns(2)
-with c1:
-    m = st.radio("", [t['upload'], t['cam']], horizontal=True)
-    file = st.file_uploader("", type=["jpg", "png", "jpeg"]) if "ارفع" in m or "Upload" in m else st.camera_input("")
+st.markdown(f"<div dir='{current_dir}' style='text-align:center;'><h1 style='color:#1E3A8A;'>{labels['title']}</h1></div>", unsafe_allow_html=True)
+st.warning(labels['advice'])
 
-if file:
-    img = Image.open(file).convert('RGB')
-    with c2: st.image(img, use_container_width=True)
+# مساحة العمل الأساسية
+col_upload, col_result = st.columns([1, 1])
+
+with col_upload:
+    st.markdown(f"<div dir='{current_dir}'><strong>{labels['upload']}</strong></div>", unsafe_allow_html=True)
+    source_option = st.radio("", ["Upload Image", "Use Camera"], label_visibility="collapsed")
     
-    if st.button(t['btn']):
-        with st.spinner("⏳ Analyzing..."):
-            img_np = np.array(img)
-            img_res = cv2.resize(img_np, (224, 224))
-            
-            # المرحلة 1: فلترة الكائنات
-            xf = tf.keras.applications.mobilenet_v2.preprocess_input(np.expand_dims(img_res.copy(), axis=0))
-            f_preds = filter_m.predict(xf)
-            decoded = tf.keras.applications.mobilenet_v2.decode_predictions(f_preds, top=3)[0]
-            
-            is_valid = True
-            for _, label, score in decoded:
-                if any(x in label.lower() for x in ['car', 'wheel', 'dog', 'cat', 'flower', 'laptop', 'building']) and score > 0.4:
-                    is_valid = False
-            
-            if not is_valid:
-                st.error(t['invalid'])
-            else:
-                # المرحلة 2: تحسين الصورة (CLAHE)
-                lab = cv2.cvtColor(img_res, cv2.COLOR_RGB2LAB)
-                l, a, b = cv2.split(lab)
-                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-                img_proc = cv2.merge((clahe.apply(l), a, b))
-                img_proc = cv2.cvtColor(img_proc, cv2.COLOR_LAB2RGB)
-                
-                # المرحلة 3: التشخيص (بمدخل واحد الآن)
-                inp = tf.keras.applications.efficientnet.preprocess_input(np.expand_dims(img_proc, axis=0))
-                res_preds = diag_m.predict(inp)[0] # تم تعديله ليرسل مدخلاً واحداً فقط
-                
-                idx = np.argmax(res_preds)
-                res = MEDICAL_INFO[idx]
-                
-                st.markdown(f"""
-                <div style="padding:30px; border-radius:15px; border:10px solid {res['c']}; text-align:center; background:white; margin-top:20px;">
-                    <h1 style="color:{res['c']}; font-size:2.4em;">{res['n']}</h1>
-                    <h2 style="color:#444;">التصنيف: {res['s']}</h2>
-                    <hr style="border:1px solid {res['c']}; width:40%; margin:auto;">
-                    <p style="font-size:1.3em; color:#333; margin-top:15px; font-weight:bold;">{res['d']}</p>
-                    <p>نسبة التأكد: {res_preds[idx]*100:.1f}%</p>
-                </div>
-                """, unsafe_allow_html=True)
+    if source_option == "Upload Image":
+        uploaded_file = st.file_uploader("", type=["jpg", "png", "jpeg"])
+    else:
+        uploaded_file = st.camera_input("")
 
-# --- 5. الدليل المرجعي ---
-st.write("---")
-st.subheader("📖 الدليل المرجعي")
-selected_info = st.selectbox("اختر فئة لعرض التفاصيل:", [v['n'] for v in MEDICAL_INFO.values()])
-for k, v in MEDICAL_INFO.items():
-    if v['n'] == selected_info:
-        st.markdown(f"<div style='background-color:{v['c']}10; padding:20px; border-right:10px solid {v['c']};'><h3>{v['n']}</h3><p>{v['d']}</p></div>", unsafe_allow_html=True)
+if uploaded_file:
+    input_img = Image.open(uploaded_file).convert('RGB')
+    
+    with col_result:
+        st.image(input_img, caption="الصورة المرفوعة", use_container_width=True)
+        
+        if st.button(labels['btn']):
+            with st.spinner("⏳ جاري معالجة البيانات وتحليل الأنسجة..."):
+                # تحضير الصورة
+                img_array = np.array(input_img)
+                img_resized = cv2.resize(img_array, (224, 224))
+                
+                # المرحلة 1: التحقق من أن الصورة هي للجلد فعلاً
+                check_input = tf.keras.applications.mobilenet_v2.preprocess_input(np.expand_dims(img_resized.copy(), axis=0))
+                filter_preds = filter_model.predict(check_input)
+                decoded_preds = tf.keras.applications.mobilenet_v2.decode_predictions(filter_preds, top=3)[0]
+                
+                is_skin_image = True
+                invalid_keywords = ['car', 'dog', 'cat', 'flower', 'building', 'laptop', 'furniture']
+                for _, label, score in decoded_preds:
+                    if any(key in label.lower() for key in invalid_keywords) and score > 0.45:
+                        is_skin_image = False
+                
+                if not is_skin_image:
+                    st.error(labels['invalid'])
+                else:
+                    # المرحلة 2: التحليل والتشخيص
+                    diag_input = tf.keras.applications.efficientnet.preprocess_input(np.expand_dims(img_resized, axis=0))
+                    prediction = diag_model.predict(diag_input)[0]
+                    
+                    # استخراج النتيجة (حميد أو خبيث)
+                    result_idx = np.argmax(prediction)
+                    result_data = DIAGNOSIS_MAP[result_idx]
+                    
+                    # عرض النتيجة النهائية بشكل بارز جداً
+                    st.markdown(f"""
+                    <div style="padding:50px; border-radius:25px; border:12px solid {result_data['color']}; text-align:center; background:white; margin-top:20px; box-shadow: 0px 4px 15px rgba(0,0,0,0.1);">
+                        <p style="font-size:1.2em; color:#666; margin-bottom:5px;">نتيجة الفحص التقديرية:</p>
+                        <h1 style="color:{result_data['color']}; font-size:6em; margin:0; font-weight:900;">{result_data['status']}</h1>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+# --- 7. الدليل الطبي المرجعي (منسدل ومرتب) ---
+st.markdown("---")
+with st.expander(f" {labels['guide_title']}"):
+    st.markdown("<br>", unsafe_allow_html=True)
+    g_col1, g_col2 = st.columns(2)
+    
+    guide_items = list(GUIDE_CONTENT.items())
+    
+    for i in range(len(guide_items)):
+        title, content = guide_items[i]
+        # تقسيم الدليل إلى عمودين
+        target_column = g_col1 if i < 5 else g_col2
+        
+        target_column.markdown(f"""
+        <div style="padding:15px; margin-bottom:15px; border-right:8px solid {content['color']}; background-color:{content['color']}10; border-radius:10px;">
+            <h4 style="color:{content['color']}; margin:0;">{title}</h4>
+            <p style="color:#444; font-size:0.95em; margin-top:8px; line-height:1.4;">{content['desc']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+# تذييل الصفحة
+st.markdown(f"<div style='text-align:center; color:#888; margin-top:50px;'><small>Skin Diagnostic AI System v2.0</small></div>", unsafe_allow_html=True)
