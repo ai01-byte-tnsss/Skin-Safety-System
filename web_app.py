@@ -9,31 +9,31 @@ import os
 import requests
 
 # --- 1. إعدادات الصفحة والملفات ---
-st.set_page_config(page_title="Skin AI Expert System", layout="wide")
+st.set_page_config(page_title="Skin AI System v7.8", layout="wide")
 
 DRIVE_FILE_ID = '135lZpgsipHNk2IZBo6H4lZZ9WzVizLqb'
 MODEL_PATH = "skin_expert_hybrid_24ch.h5"
 
-# --- 2. قاموس اللغات الكامل (الترجمة الشاملة للواجهة) ---
+# --- 2. قاموس اللغات الكامل (ترجمة شاملة) ---
 LANG_DATA = {
     "العربية": {
         "dir": "rtl",
-        "title": "نظام الفحص الذكي المتطور لأمراض الجلد",
+        "title": "نظام التشخيص الذكي المتطور للجلد",
         "upload_label": "📥 ارفع صورة الفحص أو استخدم الكاميرا",
         "btn_analyze": "🔍 بدء التحليل الفوري",
         "advice": "⚠️ تنبيه طبي: هذا النظام أداة برمجية استرشادية، ولا يغني عن زيارة الطبيب المختص.",
         "guide_title": "📖 الدليل الطبي المرجعي للأنواع",
         "malig_title": "1. الآفات الخبيثة (Malignant)",
-        "malig_desc": "سرطانات الجلد مثل BCC و Melanoma. تتطلب تدخل طبي عاجل.",
+        "malig_desc": "تشمل سرطانات الجلد مثل BCC والميلانوما. تتطلب تدخلاً طبياً عاجلاً.",
         "benign_title": "2. الآفات الحميدة (Benign)",
-        "benign_desc": "نموات غير سرطانية مثل الأكزيما، الصدفية، والشامات الحميدة.",
+        "benign_desc": "نموات غير سرطانية مثل الأكزيما والصدفية والشامات الحميدة.",
         "others_title": "3. العدوى والالتهابات",
         "others_desc": "أمراض ناتجة عن فطريات أو بكتيريا أو حساسية جلدية.",
         "link_cancer": "🔗 مصدر عالمي: سرطان الجلد (Mayo Clinic)",
         "link_others": "🔗 مصدر عالمي: الأمراض الجلدية (NHS)",
         "result_text": "التشخيص المقترح:",
         "confidence": "نسبة اليقين:",
-        "inconclusive": "تحليل غير حاسم: لم تتجاوز النسبة حد الثقة المطلوب.",
+        "inconclusive": "تحليل غير حاسم: لم تصل النسبة للحد الأدنى (يرجى إعادة التصوير).",
         "malig_note": "⚠️ خطورة عالية: يرجى مراجعة المختص فوراً.",
         "benign_note": "✅ حالة مستقرة: المؤشرات تدل على طبيعة حميدة.",
         "others_note": "🔎 حالة عدوى: يرجى استشارة الطبيب للعلاج الموضعي."
@@ -43,22 +43,22 @@ LANG_DATA = {
         "title": "Advanced Skin AI Diagnostic System",
         "upload_label": "📥 Upload Scan Image or Use Camera",
         "btn_analyze": "🔍 Start Instant Analysis",
-        "advice": "⚠️ Medical Note: This AI tool is for guidance only and not a substitute for a doctor.",
+        "advice": "⚠️ Medical Note: This AI tool is for guidance only.",
         "guide_title": "📖 Medical Reference Guide",
         "malig_title": "1. Malignant Lesions",
         "malig_desc": "Skin cancers like BCC and Melanoma. Requires urgent medical intervention.",
         "benign_title": "2. Benign Lesions",
-        "benign_desc": "Non-cancerous growths like Eczema, Psoriasis, and benign moles.",
+        "benign_desc": "Non-cancerous growths like Eczema and Psoriasis.",
         "others_title": "3. Infections & Others",
-        "others_desc": "Conditions caused by fungi, bacteria, or skin allergies.",
+        "others_desc": "Conditions caused by fungi, bacteria, or allergies.",
         "link_cancer": "🔗 Global Source: Skin Cancer (Mayo Clinic)",
         "link_others": "🔗 Global Source: Skin Conditions (NHS)",
         "result_text": "Suggested Diagnosis:",
         "confidence": "Confidence Level:",
-        "inconclusive": "Inconclusive: Confidence did not meet the required threshold.",
+        "inconclusive": "Inconclusive: Accuracy below required threshold.",
         "malig_note": "⚠️ High Risk: Please consult a specialist immediately.",
         "benign_note": "✅ Stable: Indicators suggest a benign nature.",
-        "others_note": "🔎 Infection: Please consult a doctor for topical treatment."
+        "others_note": "🔎 Infection: Please consult a doctor for treatment."
     }
 }
 
@@ -88,7 +88,7 @@ diag_model = load_hybrid_model()
 
 # --- 4. واجهة المستخدم والتفاعل ---
 selected_lang = st.sidebar.selectbox("Language Selection / اختيار اللغة", list(LANG_DATA.keys()))
-T = LANG_DATA[selected_lang] # نصوص اللغة المختارة
+T = LANG_DATA[selected_lang]
 
 st.markdown(f"<div dir='{T['dir']}' style='text-align:center;'><h1 style='color:#1E3A8A;'>{T['title']}</h1></div>", unsafe_allow_html=True)
 st.warning(T['advice'])
@@ -102,30 +102,32 @@ if uploaded:
         st.image(img, use_container_width=True)
     with col2:
         if st.button(T['btn_analyze']):
-            # معالجة الصورة
             img_res = cv2.resize(np.array(img), (224, 224))
             d_in = np.expand_dims(img_res, axis=0) / 255.0
             preds = diag_model.predict(d_in)[0]
             idx = np.argmax(preds)
             score = np.max(preds)
             
-            # --- ضبط الـ Thresholds برمجياً ---
+            # --- تعديل الـ Thresholds (الحل المقترح للتنوع) ---
             MALIGNANT_IDS = [1, 11, 23]
             BENIGN_IDS = [0, 2, 5, 9, 13, 14, 16, 20]
+            
+            # خفضنا العتبات للسماح بظهور الأنواع الأخرى
+            THRESH_MALIG = 0.40 # بدلاً من 0.65
+            THRESH_BENIGN = 0.45 # بدلاً من 0.80
             
             final_label, final_color, final_note = T['inconclusive'], "#8E8E93", ""
             
             if idx in MALIGNANT_IDS:
-                if score >= 0.65: # عتبة الخبيث 0.65
+                if score >= THRESH_MALIG:
                     final_label, final_color, final_note = T['malig_title'], "#FF3B30", T['malig_note']
             elif idx in BENIGN_IDS:
-                if score >= 0.80: # عتبة الحميد 0.80
+                if score >= THRESH_BENIGN:
                     final_label, final_color, final_note = T['benign_title'], "#34C759", T['benign_note']
             else:
-                if score >= 0.50: # عتبة أخرى
+                if score >= 0.35:
                     final_label, final_color, final_note = T['others_title'], "#FF9500", T['others_note']
 
-            # عرض النتيجة المفلترة بالـ Threshold
             st.markdown(f"""
             <div dir='{T['dir']}' style="padding:30px; border-radius:20px; border:10px solid {final_color}; text-align:center; background:white;">
                 <h2 style="color:{final_color};">{T['result_text']} {final_label}</h2>
@@ -136,21 +138,21 @@ if uploaded:
             </div>
             """, unsafe_allow_html=True)
 
-# --- 5. الدليل المرجعي (مترجم بالكامل) ---
+# --- 5. الدليل المرجعي المحدث ---
 st.markdown("---")
 with st.expander(T['guide_title']):
     st.markdown(f"<div dir='{T['dir']}'>", unsafe_allow_html=True)
     
     st.subheader(T['malig_title'])
     st.write(T['malig_desc'])
-    st.markdown(f"**Threshold: 0.65**")
+    st.markdown(f"**Threshold: 0.40**")
     st.markdown(f"[Mayo Clinic - Skin Cancer](https://www.mayoclinic.org/diseases-conditions/skin-cancer/symptoms-causes/syc-20377605)")
 
     st.write("---")
     
     st.subheader(T['benign_title'])
     st.write(T['benign_desc'])
-    st.markdown(f"**Threshold: 0.80**")
+    st.markdown(f"**Threshold: 0.45**")
 
     st.write("---")
 
@@ -159,5 +161,3 @@ with st.expander(T['guide_title']):
     st.markdown(f"[NHS - Skin Conditions](https://www.nhs.uk/conditions/skin-conditions/)")
     
     st.markdown("</div>", unsafe_allow_html=True)
-
-st.markdown(f"<div style='text-align:center; color:#888; margin-top:50px;'><small>{selected_lang} | Skin AI v7.5</small></div>", unsafe_allow_html=True)
