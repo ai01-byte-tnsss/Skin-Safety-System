@@ -14,9 +14,57 @@ st.set_page_config(page_title="Skin AI Expert System", layout="wide")
 DRIVE_FILE_ID = '135lZpgsipHNk2IZBo6H4lZZ9WzVizLqb'
 MODEL_PATH = "skin_expert_hybrid_24ch.h5"
 
-# --- 2. تحميل الموديل الهجين ---
+# --- 2. قاموس اللغات الكامل (الترجمة الشاملة للواجهة) ---
+LANG_DATA = {
+    "العربية": {
+        "dir": "rtl",
+        "title": "نظام الفحص الذكي المتطور لأمراض الجلد",
+        "upload_label": "📥 ارفع صورة الفحص أو استخدم الكاميرا",
+        "btn_analyze": "🔍 بدء التحليل الفوري",
+        "advice": "⚠️ تنبيه طبي: هذا النظام أداة برمجية استرشادية، ولا يغني عن زيارة الطبيب المختص.",
+        "guide_title": "📖 الدليل الطبي المرجعي للأنواع",
+        "malig_title": "1. الآفات الخبيثة (Malignant)",
+        "malig_desc": "سرطانات الجلد مثل BCC و Melanoma. تتطلب تدخل طبي عاجل.",
+        "benign_title": "2. الآفات الحميدة (Benign)",
+        "benign_desc": "نموات غير سرطانية مثل الأكزيما، الصدفية، والشامات الحميدة.",
+        "others_title": "3. العدوى والالتهابات",
+        "others_desc": "أمراض ناتجة عن فطريات أو بكتيريا أو حساسية جلدية.",
+        "link_cancer": "🔗 مصدر عالمي: سرطان الجلد (Mayo Clinic)",
+        "link_others": "🔗 مصدر عالمي: الأمراض الجلدية (NHS)",
+        "result_text": "التشخيص المقترح:",
+        "confidence": "نسبة اليقين:",
+        "inconclusive": "تحليل غير حاسم: لم تتجاوز النسبة حد الثقة المطلوب.",
+        "malig_note": "⚠️ خطورة عالية: يرجى مراجعة المختص فوراً.",
+        "benign_note": "✅ حالة مستقرة: المؤشرات تدل على طبيعة حميدة.",
+        "others_note": "🔎 حالة عدوى: يرجى استشارة الطبيب للعلاج الموضعي."
+    },
+    "English": {
+        "dir": "ltr",
+        "title": "Advanced Skin AI Diagnostic System",
+        "upload_label": "📥 Upload Scan Image or Use Camera",
+        "btn_analyze": "🔍 Start Instant Analysis",
+        "advice": "⚠️ Medical Note: This AI tool is for guidance only and not a substitute for a doctor.",
+        "guide_title": "📖 Medical Reference Guide",
+        "malig_title": "1. Malignant Lesions",
+        "malig_desc": "Skin cancers like BCC and Melanoma. Requires urgent medical intervention.",
+        "benign_title": "2. Benign Lesions",
+        "benign_desc": "Non-cancerous growths like Eczema, Psoriasis, and benign moles.",
+        "others_title": "3. Infections & Others",
+        "others_desc": "Conditions caused by fungi, bacteria, or skin allergies.",
+        "link_cancer": "🔗 Global Source: Skin Cancer (Mayo Clinic)",
+        "link_others": "🔗 Global Source: Skin Conditions (NHS)",
+        "result_text": "Suggested Diagnosis:",
+        "confidence": "Confidence Level:",
+        "inconclusive": "Inconclusive: Confidence did not meet the required threshold.",
+        "malig_note": "⚠️ High Risk: Please consult a specialist immediately.",
+        "benign_note": "✅ Stable: Indicators suggest a benign nature.",
+        "others_note": "🔎 Infection: Please consult a doctor for topical treatment."
+    }
+}
+
+# --- 3. تحميل الموديل الهجين ---
 @st.cache_resource
-def load_skin_model():
+def load_hybrid_model():
     input_layer = Input(shape=(224, 224, 3))
     b1 = tf.keras.applications.EfficientNetB0(weights=None, include_top=False)(input_layer)
     b2 = tf.keras.applications.MobileNetV2(weights=None, include_top=False)(input_layer)
@@ -26,7 +74,7 @@ def load_skin_model():
     model = Model(inputs=input_layer, outputs=out)
     
     if not os.path.exists(MODEL_PATH):
-        with st.spinner("جاري تهيئة النظام السحابي..."):
+        with st.spinner("Downloading AI Weights..."):
             URL = "https://docs.google.com/uc?export=download"
             session = requests.Session()
             r = session.get(URL, params={'id': DRIVE_FILE_ID}, stream=True)
@@ -36,38 +84,16 @@ def load_skin_model():
     model.load_weights(MODEL_PATH)
     return model
 
-diag_model = load_skin_model()
+diag_model = load_hybrid_model()
 
-# --- 3. منطق التشخيص مع العتبات المطلوبة ---
-def get_diagnosis_logic(idx, score):
-    # المجموعات البرمجية للأصناف الـ 24
-    MALIGNANT_IDS = [1, 11, 23] # BCC, Melanoma, High Risk Analysis
-    BENIGN_IDS = [0, 2, 5, 9, 13, 14, 16, 20] # Acne, Eczema, Psoriasis, etc.
-    
-    # العتبات المطلوبة
-    THRESHOLD_MALIGNANT = 0.65
-    THRESHOLD_BENIGN = 0.80
-    THRESHOLD_OTHERS = 0.50 # عتبة افتراضية للأنواع الأخرى لضمان الدقة
+# --- 4. واجهة المستخدم والتفاعل ---
+selected_lang = st.sidebar.selectbox("Language Selection / اختيار اللغة", list(LANG_DATA.keys()))
+T = LANG_DATA[selected_lang] # نصوص اللغة المختارة
 
-    if idx in MALIGNANT_IDS:
-        if score >= THRESHOLD_MALIGNANT:
-            return "آفة خبيثة (Malignant)", "#FF3B30", "تحذير: مؤشرات مرتفعة للإصابة بسرطان الجلد. يرجى مراجعة المختص فوراً."
-    elif idx in BENIGN_IDS:
-        if score >= THRESHOLD_BENIGN:
-            return "آفة حميدة (Benign)", "#34C759", "الحالة مستقرة: النتائج تشير إلى نمو حميد أو حالة جلدية غير سرطانية."
-    else:
-        if score >= THRESHOLD_OTHERS:
-            return "عدوى أو التهاب جلدي", "#FF9500", "تشخيص ثانوي: الحالة تظهر مؤشرات لعدوى فطرية أو بكتيرية أو حساسية."
+st.markdown(f"<div dir='{T['dir']}' style='text-align:center;'><h1 style='color:#1E3A8A;'>{T['title']}</h1></div>", unsafe_allow_html=True)
+st.warning(T['advice'])
 
-    return "تحليل غير حاسم", "#8E8E93", "تنبيه: نسبة اليقين لم تتجاوز العتبة المطلوبة. يرجى إعادة التصوير بوضوح أعلى."
-
-# --- 4. واجهة المستخدم (اللغات والتحليل) ---
-selected_lang = st.sidebar.selectbox("Language / اللغة", ["العربية", "English"])
-dir_ui = "rtl" if selected_lang == "العربية" else "ltr"
-
-st.markdown(f"<div dir='{dir_ui}' style='text-align:center;'><h1 style='color:#1E3A8A;'>نظام الفحص الذكي المتطور للجلد</h1></div>", unsafe_allow_html=True)
-
-uploaded = st.file_uploader("ارفع صورة الفحص", type=["jpg", "png", "jpeg"])
+uploaded = st.file_uploader(T['upload_label'], type=["jpg", "png", "jpeg"])
 
 if uploaded:
     img = Image.open(uploaded).convert('RGB')
@@ -75,61 +101,63 @@ if uploaded:
     with col1:
         st.image(img, use_container_width=True)
     with col2:
-        if st.button("🔍 بدء التحليل"):
+        if st.button(T['btn_analyze']):
+            # معالجة الصورة
             img_res = cv2.resize(np.array(img), (224, 224))
             d_in = np.expand_dims(img_res, axis=0) / 255.0
             preds = diag_model.predict(d_in)[0]
-            best_idx = np.argmax(preds)
-            best_score = np.max(preds)
+            idx = np.argmax(preds)
+            score = np.max(preds)
             
-            label, color, note = get_diagnosis_logic(best_idx, best_score)
+            # --- ضبط الـ Thresholds برمجياً ---
+            MALIGNANT_IDS = [1, 11, 23]
+            BENIGN_IDS = [0, 2, 5, 9, 13, 14, 16, 20]
             
+            final_label, final_color, final_note = T['inconclusive'], "#8E8E93", ""
+            
+            if idx in MALIGNANT_IDS:
+                if score >= 0.65: # عتبة الخبيث 0.65
+                    final_label, final_color, final_note = T['malig_title'], "#FF3B30", T['malig_note']
+            elif idx in BENIGN_IDS:
+                if score >= 0.80: # عتبة الحميد 0.80
+                    final_label, final_color, final_note = T['benign_title'], "#34C759", T['benign_note']
+            else:
+                if score >= 0.50: # عتبة أخرى
+                    final_label, final_color, final_note = T['others_title'], "#FF9500", T['others_note']
+
+            # عرض النتيجة المفلترة بالـ Threshold
             st.markdown(f"""
-            <div style="padding:30px; border-radius:20px; border:10px solid {color}; text-align:center; background:white;">
-                <h2 style="color:{color};">{label}</h2>
-                <p style='font-size:1.1em;'>{note}</p>
-                <div style="background:{color}10; padding:10px; border-radius:10px;">
-                    <strong>نسبة الثقة المتحققة: {best_score*100:.2f}%</strong>
+            <div dir='{T['dir']}' style="padding:30px; border-radius:20px; border:10px solid {final_color}; text-align:center; background:white;">
+                <h2 style="color:{final_color};">{T['result_text']} {final_label}</h2>
+                <p style='font-size:1.1em;'>{final_note}</p>
+                <div style="background:{final_color}10; padding:10px; border-radius:10px;">
+                    <strong>{T['confidence']} {score*100:.2f}%</strong>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-# --- 5. الدليل الطبي المطور مع الروابط العالمية ---
+# --- 5. الدليل المرجعي (مترجم بالكامل) ---
 st.markdown("---")
-with st.expander("📖 الدليل الطبي المرجعي للأنواع"):
-    st.markdown(f"<div dir='{dir_ui}'>", unsafe_allow_html=True)
+with st.expander(T['guide_title']):
+    st.markdown(f"<div dir='{T['dir']}'>", unsafe_allow_html=True)
     
-    st.subheader("1. الآفات الخبيثة (Malignant Lesions)")
-    st.write("""
-    تشمل سرطانات الجلد التي تنشأ نتيجة نمو غير طبيعي لخلايا الجلد، وأبرزها:
-    * **BCC:** سرطان الخلايا القاعدية، وهو الأكثر شيوعاً.
-    * **Melanoma:** الميلانوما، وهو النوع الأخطر الذي قد ينتقل لأعضاء أخرى.
-    """)
-    st.markdown("[🔗 لمزيد من المعلومات حول سرطان الجلد (Mayo Clinic)](https://www.mayoclinic.org/diseases-conditions/skin-cancer/symptoms-causes/syc-20377605)")
-    st.markdown(f"**عتبة القرار البرمجية (Threshold): {0.65}**")
+    st.subheader(T['malig_title'])
+    st.write(T['malig_desc'])
+    st.markdown(f"**Threshold: 0.65**")
+    st.markdown(f"[Mayo Clinic - Skin Cancer](https://www.mayoclinic.org/diseases-conditions/skin-cancer/symptoms-causes/syc-20377605)")
 
     st.write("---")
     
-    st.subheader("2. الآفات الحميدة (Benign Lesions)")
-    st.write("""
-    هي نموات غير سرطانية ولا تشكل خطراً على الحياة، ومنها:
-    * **الأكزيما والصدفية:** حالات التهابية مزمنة.
-    * **الشامات الحميدة:** تجمعات صبغية طبيعية.
-    * **الأورام الوعائية:** نموات حميدة في الأوعية الدموية.
-    """)
-    st.markdown(f"**عتبة القرار البرمجية (Threshold): {0.80}**")
+    st.subheader(T['benign_title'])
+    st.write(T['benign_desc'])
+    st.markdown(f"**Threshold: 0.80**")
 
     st.write("---")
 
-    st.subheader("3. العدوى والالتهابات (Infections & Others)")
-    st.write("""
-    تشمل الأمراض الجلدية الناتجة عن مسببات خارجية أو حساسية:
-    * **الفطريات:** مثل فطريات الأظافر والقوباء الحلقية.
-    * **العدوى البكتيرية:** مثل الالتهاب الخلوي.
-    * **الحساسية:** مثل الأرتيكاريا والطفح الدوائي.
-    """)
-    st.markdown("[🔗 دليل الأمراض الجلدية والعدوى (NHS)](https://www.nhs.uk/conditions/skin-conditions/)")
+    st.subheader(T['others_title'])
+    st.write(T['others_desc'])
+    st.markdown(f"[NHS - Skin Conditions](https://www.nhs.uk/conditions/skin-conditions/)")
     
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("<div style='text-align:center; color:#888; margin-top:50px;'><small>Graduation Project | Skin AI Diagnostics v7.0</small></div>", unsafe_allow_html=True)
+st.markdown(f"<div style='text-align:center; color:#888; margin-top:50px;'><small>{selected_lang} | Skin AI v7.5</small></div>", unsafe_allow_html=True)
