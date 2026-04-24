@@ -7,51 +7,54 @@ import os
 import zipfile
 import gdown
 
-# --- 1. إعدادات الواجهة الاحترافية ---
-st.set_page_config(page_title="Skin Safety AI Expert", page_icon="🧬", layout="wide")
+# --- 1. إعدادات الصفحة والتصميم ---
+st.set_page_config(page_title="Skin AI System", page_icon="🔍", layout="centered")
 
+# إضافة CSS لتحسين مظهر القوائم الملونة والدليل الطبي
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
-    .report-box { padding: 30px; border-radius: 20px; background-color: white; border-right: 15px solid #1E3A8A; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-    .status-danger { color: #D32F2F; background-color: #FFEBEE; padding: 10px; border-radius: 10px; font-weight: bold; }
-    .status-safe { color: #388E3C; background-color: #E8F5E9; padding: 10px; border-radius: 10px; font-weight: bold; }
-    .stButton>button { width: 100%; border-radius: 12px; height: 3.5em; background-color: #1E3A8A; color: white; font-weight: bold; }
+    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: center; }
+    .stSelectbox, .stExpander { border-radius: 10px; background-color: #f8f9fa; }
+    .guide-benign { background-color: #e8f5e9; padding: 15px; border-radius: 10px; border-right: 5px solid #2e7d32; margin-bottom: 10px; text-align: right; }
+    .guide-malignant { background-color: #ffebee; padding: 15px; border-radius: 10px; border-right: 5px solid #c62828; margin-bottom: 10px; text-align: right; }
+    .report-card { padding: 25px; border-radius: 15px; background-color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. مصفوفة التصنيف المرتبة (مطابقة لمجلداتك السبعة 100%) ---
-# الترتيب الأبجدي للمجلدات كما ظهر في صورتك: akiec, bcc, bkl, df, mel, nv, vasc
-CLASS_MAPPING = {
-    0: {"name": "التقرن الضوئي (Actinic Keratosis)", "status": "خبيث جزئياً / متابعة"},
-    1: {"name": "سرطان الخلايا القاعدية (BCC)", "status": "خبيث - يتطلب تدخل"},
-    2: {"name": "آفات التقرن الحميدة (BKL)", "status": "حميد - غير مقلق"},
-    3: {"name": "الأورام الليفية الجلدية (DF)", "status": "حميد - زوائد ليفية"},
-    4: {"name": "الميلانوما - سرطان الجلد (Melanoma)", "status": "خبيث جداً - مراجعة فورية"},
-    5: {"name": "الشامات والوحمات (Nevus)", "status": "حميد - شامة طبيعية"},
-    6: {"name": "الآفات الوعائية (Vascular Lesions)", "status": "حميد - أوعية دموية"}
+# --- 2. نظام اللغات (10 لغات عالمية) ---
+languages = {
+    "العربية": {"title": "نظام الفحص الذكي للجلد", "upload": "ارفع صورة الفحص أو استخدم الكاميرا", "btn": "تحليل العينة", "lang_label": "اختر اللغة / Select Language"},
+    "English": {"title": "Skin AI Diagnostic System", "upload": "Upload Image or Use Camera", "btn": "Analyze Sample", "lang_label": "Select Language"},
+    "Français": {"title": "Système d'IA Cutanée", "upload": "Télécharger une image", "btn": "Analyser", "lang_label": "Choisir la langue"},
+    "Español": {"title": "Sistema IA de Piel", "upload": "Subir imagen", "btn": "Analizar", "lang_label": "Seleccionar idioma"},
+    "Deutsch": {"title": "Haut-KI-System", "upload": "Bild hochladen", "btn": "Analysieren", "lang_label": "Sprache wählen"},
+    "Türkçe": {"title": "Cilt Yapay Zeka Sistemi", "upload": "Fotoğraf Yükle", "btn": "Analiz Et", "lang_label": "Dil Seçin"},
+    "中文": {"title": "皮肤人工智能系统", "upload": "上传图片", "btn": "开始分析", "lang_label": "选择语言"},
+    "Русский": {"title": "Система ИИ Кожи", "upload": "Загрузить фото", "btn": "Анализировать", "lang_label": "Выберите язык"},
+    "Português": {"title": "Sistema de IA da Pele", "upload": "Enviar imagem", "btn": "Analisar", "lang_label": "Selecionar idioma"},
+    "हिन्दी": {"title": "त्वचा एआई प्रणाली", "upload": "छवि अपलोड करें", "btn": "विश्लेषण करें", "lang_label": "भाषा चुनें"}
 }
 
-# --- 3. الدوال الرياضية ومعالجة المصفوفات (Normalization & Resizing) ---
-def apply_skin_math(image):
-    # أ. دالة تغيير الحجم لمصفوفة ثابتة (224x224)
-    img = np.array(image.convert('RGB'))
-    img = cv2.resize(img, (224, 224), interpolation=cv2.INTER_AREA)
-    
-    # ب. فلاتر تحسين التباين لإبراز حدود الإصابة
-    img_yuv = cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
-    img_yuv[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
-    img = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2RGB)
-    
-    # ج. دالة التطبيع (Normalization) تحويل النطاق إلى [0, 1]
-    return (img.astype(np.float32) / 255.0)[np.newaxis, ...]
+selected_lang = st.sidebar.selectbox("🌐 Language / اللغة", list(languages.keys()))
+content = languages[selected_lang]
 
-# --- 4. تحميل المحرك (التلافيف وسوفت ماكس) ---
+# --- 3. المصفوفة الطبية المرتبة (مطابقة لمجلداتك السبعة) ---
+CLASS_MAP = {
+    0: {"ar": "التقرن الضوئي (AK)", "en": "Actinic Keratosis", "type": "خبيث جزئياً / متابعة"},
+    1: {"ar": "سرطان الخلايا القاعدية (BCC)", "en": "Basal Cell Carcinoma", "type": "خبيث - يتطلب تدخل"},
+    2: {"ar": "آفات التقرن الحميدة (BKL)", "en": "Benign Keratosis", "type": "حميد - غير مقلق"},
+    3: {"ar": "الأورام الليفية الجلدية (DF)", "en": "Dermatofibroma", "type": "حميد"},
+    4: {"ar": "الميلانوما (MEL)", "en": "Melanoma", "type": "خبيث جداً"},
+    5: {"ar": "الشامات والوحمات (NV)", "en": "Melanocytic Nevi", "type": "حميد - طبيعي"},
+    6: {"ar": "الآفات الوعائية (VASC)", "en": "Vascular Lesions", "type": "حميد"}
+}
+
+# --- 4. تحميل المحرك وتحضير الصورة ---
 @st.cache_resource
-def load_expert_engine():
+def load_model():
     f_id = '1lMGCojHeGupFunhxX5GnLOiUgxWbbRC5'
-    path = "skin_model_final.h5"
+    path = "final_expert_model.h5"
     if not os.path.exists(path):
         gdown.download(f'https://drive.google.com/uc?id={f_id}', "model.zip", quiet=False)
         with zipfile.ZipFile("model.zip", 'r') as z:
@@ -59,55 +62,56 @@ def load_expert_engine():
                 if f.endswith('.h5'):
                     with open(path, "wb") as out: out.write(z.read(f))
                     break
-    try:
-        # بناء هيكل CNN ليتناسب مع الـ 7 فئات فقط
-        base = tf.keras.applications.MobileNetV2(input_shape=(224,224,3), include_top=False)
-        x = tf.keras.layers.GlobalAveragePooling2D()(base.output)
-        x = tf.keras.layers.Dense(512, activation='relu')(x) # ReLU Function
-        # دالة سوفت ماكس لـ 7 فئات
-        output = tf.keras.layers.Dense(7, activation='softmax')(x) 
+    model = tf.keras.models.load_model(path, compile=False)
+    return model
+
+def prep_image(img):
+    img = np.array(img.convert('RGB'))
+    img = cv2.resize(img, (224, 224))
+    return (img.astype(np.float32) / 255.0)[np.newaxis, ...]
+
+model = load_model()
+
+# --- 5. الواجهة الرسومية ---
+st.title(content["title"])
+st.warning("⚠️ تنبيه طبي: هذا النظام أداة برمجية استرشادية تعتمد على الذكاء الاصطناعي، ولا يغني عن زيارة الطبيب المختص.")
+
+# خيارات الرفع (مثل الصورة المطلوبة)
+source = st.radio("", ["Upload Image", "Use Camera"], horizontal=True)
+file = st.file_uploader(content["upload"], type=["jpg", "png", "jpeg"]) if source == "Upload Image" else st.camera_input("Capture")
+
+if file:
+    img = Image.open(file)
+    st.image(img, width=300)
+    if st.button(content["btn"]):
+        processed = prep_image(img)
+        preds = model.predict(processed)[0]
+        idx = np.argmax(preds)
+        res = CLASS_MAP[idx]
         
-        model = tf.keras.Model(inputs=base.input, outputs=output)
-        model.load_weights(path, by_name=True, skip_mismatch=True)
-        return model
-    except:
-        return tf.keras.models.load_model(path, compile=False)
+        st.markdown(f"""
+        <div class="report-card">
+            <h3>اسم المرض المتوقع:</h3>
+            <h2 style="color:#1E3A8A;">{res['ar']} <br> <small>({res['en']})</small></h2>
+            <hr>
+            <h4>تصنيف الحالة:</h4>
+            <p style="font-size:1.2em; font-weight:bold;">{res['type']}</p>
+            <p>دقة المطابقة: {preds[idx]:.2%}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-model = load_expert_engine()
+# --- 6. الدليل الطبي المرجعي (منسدل وملون) ---
+st.markdown("---")
+with st.expander("📖 الدليل الطبي المرجعي لآفات الجلد"):
+    st.markdown("""
+        <div class="guide-benign">
+            <h4 style="color:#2e7d32;">🟢 الآفات الحميدة (Benign)</h4>
+            <p>تشمل الشامات العادية (NV)، والتقرن الدهني (BKL)، والأورام الليفية. عادة لا تشكل خطراً ولكن يفضل مراقبة أي تغير في الحجم أو اللون.</p>
+        </div>
+        <div class="guide-malignant">
+            <h4 style="color:#c62828;">🔴 الآفات الخبيثة (Malignant)</h4>
+            <p>تشمل الميلانوما (MEL) وسرطان الخلايا القاعدية (BCC). تتطلب هذه الحالات استشارة طبية فورية وعمل خزعة للتأكد، حيث أن التدخل المبكر يرفع نسب الشفاء.</p>
+        </div>
+    """, unsafe_allow_html=True)
 
-# --- 5. الواجهة والتشخيص الفوري ---
-st.markdown("<h1 style='text-align:center;'>🧬 خبير سلامة الجلد - نظام التصنيف السباعي</h1>", unsafe_allow_html=True)
-
-up = st.file_uploader("ارفع صورة الفحص من المجلدات الموضحة في صورتك", type=["jpg", "png", "jpeg"])
-
-if up:
-    col1, col2 = st.columns([1, 1.2], gap="large")
-    img_raw = Image.open(up)
-    with col1:
-        st.image(img_raw, use_container_width=True, caption="العينة المرفوعة")
-    
-    with col2:
-        if st.button("🚀 بدء تحليل الأنسجة (Softmax)"):
-            if model:
-                with st.spinner("⏳ جاري معالجة المصفوفات واستخراج الميزات..."):
-                    # المعالجة والتطبيع
-                    processed_img = apply_skin_math(img_raw)
-                    # التنبؤ (دالة التلافيف وسوفت ماكس)
-                    preds = model.predict(processed_img)[0]
-                    # دالة Argmax لاختيار الفئة الصحيحة
-                    idx = np.argmax(preds)
-                    
-                    res = CLASS_MAPPING[idx]
-                    css = "status-danger" if "خبيث" in res['status'] else "status-safe"
-
-                    st.markdown(f"""
-                    <div class="report-box">
-                        <h3 style="color:#1E3A8A;">التشخيص المكتشف:</h3>
-                        <p style="font-size:1.7em; font-weight:bold;">{res['name']}</p>
-                        <h3 style="color:#1E3A8A;">تصنيف الحالة:</h3>
-                        <div class="{css}">{res['status']}</div>
-                        <hr>
-                        <p><b>دقة دالة Softmax:</b> {preds[idx]:.2%}</p>
-                        <p style="font-size:0.85em; color:gray;">يتم التصنيف بناءً على ترتيب المجلدات السبعة المستخرجة.</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+st.caption("Skin Diagnostic AI System v2.0 | Powered by CNN")
