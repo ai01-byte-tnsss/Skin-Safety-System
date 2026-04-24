@@ -1,6 +1,1 @@
-scikit-image
-albumentations
-shap
-tf-explain
-onnxruntime
-loguru  # لمراقبة الأخطاء (Logging) بدلاً من print
+
