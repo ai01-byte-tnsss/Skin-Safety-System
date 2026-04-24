@@ -7,10 +7,10 @@ import numpy as np
 import cv2
 import os
 
-# --- إعدادات الصفحة ---
+# --- 1. إعدادات الصفحة ---
 st.set_page_config(page_title="Skin AI Expert System", layout="wide")
 
-# --- الدليل المرجعي لـ 24 صنف (مرتب حسب نتائج تدريبك) ---
+# --- 2. الدليل المرجعي الكامل (24 صنف) ---
 MEDICAL_INFO = {
     0: {"n": "Acne and Rosacea", "s": "✅ حالة شائعة", "c": "#34C759", "d": "حب الشباب والوردية؛ حالات تتعلق بانسداد المسام والتهاب الغدد الدهنية."},
     1: {"n": "Actinic Keratosis / BCC", "s": "🚨 خبيث / ما قبل سرطاني", "c": "#FF3B30", "d": "تقرن ضوئي أو سرطان الخلايا القاعدية؛ يتطلب استشارة طبية فورية."},
@@ -35,27 +35,31 @@ MEDICAL_INFO = {
     20: {"n": "Vascular Tumors", "s": "✅ حميد غالباً", "c": "#34C759", "d": "أورام وعائية؛ تجمعات دموية تظهر كبقع حمراء بارزة."},
     21: {"n": "Vasculitis", "s": "🚨 خطير", "c": "#FF3B30", "d": "التهاب الأوعية الدموية؛ يسبب بقعاً أرجوانية نتيجة نزف تحت الجلد."},
     22: {"n": "Warts / Viral Infections", "s": "🦠 عدوى فيروسية", "c": "#FF9500", "d": "الثآليل الفيروسية؛ تظهر نتيجة نشاط فيروسي في الجلد."},
-    23: {"n": "Archive / Other", "s": "🔍 غير محدد", "c": "#8E8E93", "d": "حالات غير مصنفة حالياً ضمن القائمة الرئيسية."},
+    23: {"n": "Archive / Other", "s": "🔍 غير محدد", "c": "#8E8E93", "d": "حالات مؤرشفة أو غير مصنفة حالياً."},
 }
 
-# --- دالة تجميع وتحميل النموذج الهجين ---
+# --- 3. دالة تجميع وتحميل النموذج الهجين ---
 @st.cache_resource
 def load_system_model():
     parts = ["skin_expert_hybrid_24ch.z01", "skin_expert_hybrid_24ch.z02", "skin_expert_hybrid_24ch.z03"]
-    temp_h5 = "final_assembled_model.h5"
+    # استخدام اسم ملف جديد تماماً لتجنب الـ Cache المعطوب
+    temp_h5 = "model_assembled_v100.h5"
     
     try:
-        # دمج الأجزاء بايت ببايت لضمان سلامة الملف
+        # حذف الملف إذا كان موجوداً مسبقاً لضمان دمج جديد ونظيف
+        if os.path.exists(temp_h5):
+            os.remove(temp_h5)
+            
         with open(temp_h5, "wb") as outfile:
             for part in parts:
                 if os.path.exists(part):
                     with open(part, "rb") as infile:
                         outfile.write(infile.read())
                 else:
-                    st.error(f"الملف {part} مفقود!")
+                    st.error(f"❌ الملف {part} مفقود!")
                     return None
         
-        # بناء الهيكل الهجين
+        # بناء الهيكل
         b1 = tf.keras.applications.EfficientNetB0(weights=None, include_top=False, input_shape=(224, 224, 3))
         b2 = tf.keras.applications.MobileNetV2(weights=None, include_top=False, input_shape=(224, 224, 3))
         c = Concatenate()([GlobalAveragePooling2D()(b1.output), GlobalAveragePooling2D()(b2.output)])
@@ -68,16 +72,16 @@ def load_system_model():
         full_model.load_weights(temp_h5)
         return full_model
     except Exception as e:
-        st.error(f"خطأ في تحميل النموذج: {e}")
+        st.error(f"⚠️ خطأ فني في محرك الذكاء الاصطناعي: {e}")
         return None
 
 model = load_system_model()
 
-# --- واجهة المستخدم ---
-st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>نظام فحص الجلد الذكي - 24 صنف</h1>", unsafe_allow_html=True)
+# --- 4. واجهة المستخدم ---
+st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>الذكاء الاصطناعي لفحص سلامة الجلد</h1>", unsafe_allow_html=True)
 st.write("---")
 
-file = st.file_uploader("📥 ارفع صورة الجلد للفحص", type=["jpg", "png", "jpeg"])
+file = st.file_uploader("📥 ارفع صورة الجلد (JPG, PNG)", type=["jpg", "png", "jpeg"])
 
 if file and model:
     img = Image.open(file).convert('RGB')
@@ -87,16 +91,10 @@ if file and model:
         st.image(img, caption="الصورة المرفوعة", use_container_width=True)
     
     if st.button("🔍 بدء التحليل الرقمي"):
-        with st.spinner("⏳ جاري تحليل الأنماط..."):
+        with st.spinner("⏳ جاري تحليل الأنماط الحيوية..."):
             # معالجة الصورة
             img_res = cv2.resize(np.array(img), (224, 224))
-            # تحسين التباين (CLAHE) لزيادة الدقة
-            lab = cv2.cvtColor(img_res, cv2.COLOR_RGB2LAB)
-            l, a, b = cv2.split(lab)
-            l = cv2.createCLAHE(clipLimit=3.0).apply(l)
-            img_proc = cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2RGB)
-            
-            inp = (img_proc.astype(np.float32) / 255.0)[np.newaxis, ...]
+            inp = (img_res.astype(np.float32) / 255.0)[np.newaxis, ...]
             
             # التنبؤ
             preds = model.predict([inp, inp])[0]
@@ -104,8 +102,8 @@ if file and model:
             conf = preds[idx]
             res = MEDICAL_INFO[idx]
             
-            # تطبيق شروط النسب (0.40 خبيث، 0.45 حميد)
-            is_serious = "🚨" in res['s'] or "⚠️" in res['s']
+            # منطق النسب (0.40 خبيث، 0.45 حميد)
+            is_serious = "🚨" in res['s']
             threshold = 0.40 if is_serious else 0.45
             
             if conf >= threshold:
@@ -114,10 +112,10 @@ if file and model:
                     <div style="padding:20px; border-radius:10px; border-right:15px solid {res['c']}; background-color:#f8f9fa;">
                         <h2 style="color:{res['c']};">{res['n']}</h2>
                         <h4>التصنيف: {res['s']}</h4>
-                        <p style="font-size:1.2em;"><b>نسبة الثقة:</b> {conf:.2%}</p>
+                        <p style="font-size:1.2em;"><b>دقة التنبؤ:</b> {conf:.2%}</p>
                         <hr>
                         <p>{res['d']}</p>
                     </div>
                     """, unsafe_allow_html=True)
             else:
-                st.warning("⚠️ الصورة غير واضحة بما يكفي لاتخاذ قرار دقيق.")
+                st.warning("⚠️ لم يتمكن النظام من تحديد الحالة بدقة كافية. يرجى محاولة رفع صورة أوضح.")
