@@ -7,145 +7,106 @@ import os
 import zipfile
 import gdown
 
-# --- 1. إعدادات الصفحة والتصميم العربي ---
-st.set_page_config(page_title="Skin AI Expert", page_icon="🧬", layout="wide")
+# --- 1. إعدادات الصفحة ---
+st.set_page_config(page_title="Skin Health AI Expert", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [class*="css"] { 
-        font-family: 'Cairo', sans-serif; 
-        text-align: right; 
-        direction: rtl; 
-    }
-    .stButton>button { 
-        width: 100%; border-radius: 12px; height: 3.5em; 
-        background-color: #1E3A8A; color: white; font-weight: bold; 
-    }
-    .report-box { 
-        padding: 20px; border-radius: 15px; background-color: white; 
-        border-right: 10px solid #1E3A8A; box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
-    }
+    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
+    .stButton>button { width: 100%; border-radius: 12px; height: 3.5em; background-color: #1E3A8A; color: white; font-weight: bold; }
+    .malignant { color: #D32F2F; background-color: #FFEBEE; padding: 10px; border-radius: 8px; font-weight: bold; } /* تنبيه أحمر */
+    .benign { color: #388E3C; background-color: #E8F5E9; padding: 10px; border-radius: 8px; font-weight: bold; }    /* تنبيه أخضر */
+    .report-box { padding: 25px; border-radius: 15px; background-color: white; border-right: 10px solid #1E3A8A; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
     </style>
     """, unsafe_allow_html=True)
 
-# قائمة فئات الأمراض الـ 24
-DISEASES = {
-    0: "حب الشباب والوردية", 1: "التقرن الضوئي", 2: "التهاب الجلد التأتبي", 
-    3: "سرطان الخلايا القاعدية", 4: "آفات حميدة", 5: "أمراض جلدية فقاعية",
-    6: "التهاب النسيج الخلوي", 7: "الطفح الدوائي", 8: "الأكزيما", 
-    9: "الأمراض الخارجية", 10: "العدوى الفطرية", 11: "الهربس والزوائد",
-    12: "الأمراض الجلدية الخفيفة", 13: "الورم الميلانيني", 14: "الوحمات والشامات",
-    15: "أورام ليمفاوية", 16: "الصدفية والقمط", 17: "لسعات الحشرات",
-    18: "القرنية الدهنية", 19: "سرطان الخلايا الحرشفية", 20: "السعفة",
-    21: "الشري والحساسية", 22: "الأورام الوعائية", 23: "الثآليل"
+# --- 2. قاعدة البيانات الطبية المصنفة (24 فئة) ---
+DISEASES_DB = {
+    0: {"name": "حب الشباب والوردية (Acne/Rosacea)", "status": "حميد / التهابي"},
+    1: {"name": "التقرن الضوئي (Actinic Keratosis)", "status": "ما قبل خبيث - يحتاج متابعة"},
+    2: {"name": "التهاب الجلد التأتبي (Atopic Dermatitis)", "status": "حميد / التهابي"},
+    3: {"name": "سرطان الخلايا القاعدية (Basal Cell Carcinoma)", "status": "خبيث - راجع الطبيب"},
+    4: {"name": "التقرن الحميد (Benign Keratosis)", "status": "حميد"},
+    5: {"name": "الأمراض الفقاعية (Bullous Disease)", "status": "مناعي / يحتاج فحص"},
+    6: {"name": "التهاب النسيج الخلوي (Cellulitis)", "status": "عدوى بكتيرية - تحتاج علاج"},
+    7: {"name": "الطفح الدوائي (Drug Eruptions)", "status": "تحسسي"},
+    8: {"name": "الأكزيما (Eczema)", "status": "حميد / التهابي"},
+    9: {"name": "الطفح الفيروسي (Exanthems)", "status": "عدوى فيروسية"},
+    10: {"name": "العدوى الفطرية (Fungal Infections)", "status": "عدوى فطرية"},
+    11: {"name": "الهربس / زوائد فيروسية (Herpes/HPV)", "status": "فيروسي معدي"},
+    12: {"name": "أمراض الحساسية الضوئية (Light Diseases)", "status": "تحسس ضوئي"},
+    13: {"name": "الميلانوما (Melanoma)", "status": "خبيث جداً - مراجعة فورية"},
+    14: {"name": "الشامات والوحمات (Nevi/Moles)", "status": "حميد"},
+    15: {"name": "أورام ليمفاوية جلدية (Lymphoma)", "status": "خبيث / فحص نسيجي"},
+    16: {"name": "الصدفية (Psoriasis)", "status": "حميد / مزمن"},
+    17: {"name": "الجرب ولسعات الحشرات (Scabies/Bites)", "status": "طفيلي معدي"},
+    18: {"name": "التقرن الدهني (Seborrheic Keratosis)", "status": "حميد"},
+    19: {"name": "سرطان الخلايا الحرشفية (SCC)", "status": "خبيث - تدخل جراحي"},
+    20: {"name": "السعفة (Tinea)", "status": "فطري معدي"},
+    21: {"name": "الشري / الحساسية (Urticaria)", "status": "تحسس مؤقت"},
+    22: {"name": "الأورام الوعائية (Vascular Tumors)", "status": "حميد وعائي"},
+    23: {"name": "الثآليل (Warts)", "status": "حميد فيروسي"}
 }
 
-# --- 2. محرك تحميل الأوزان الذكي ---
+# --- 3. محرك التحميل ---
 @st.cache_resource
 def load_ai_engine():
     file_id = '1lMGCojHeGupFunhxX5GnLOiUgxWbbRC5'
-    download_url = f'https://drive.google.com/uc?id={file_id}'
-    zip_file = "model_weights.zip"
-    extract_folder = "model_dir"
-
+    url = f'https://drive.google.com/uc?id={file_id}'
+    zip_f, dir_f = "weights.zip", "weights_dir"
     try:
-        # 1. تحميل الملف من Google Drive
-        if not os.path.exists(zip_file):
-            with st.spinner("⏳ جاري تحميل محرك الذكاء الاصطناعي..."):
-                gdown.download(download_url, zip_file, quiet=False)
-        
-        # 2. فك الضغط
-        if not os.path.exists(extract_folder):
-            with zipfile.ZipFile(zip_file, 'r') as zip_ref:
-                zip_ref.extractall(extract_folder)
-        
-        # 3. تحديد مكان ملف h5
-        h5_path = None
-        for root, dirs, files in os.walk(extract_folder):
-            for f in files:
-                if f.endswith(".h5"):
-                    h5_path = os.path.join(root, f)
-                    break
-        
-        if h5_path:
-            # 4. بناء الهيكل (Architecture)
-            # تم اختيار MobileNetV2 كقاعدة لأنه الأكثر توافقاً مع الأوزان المرفوعة
-            base_model = tf.keras.applications.MobileNetV2(input_shape=(224, 224, 3), include_top=False, weights=None)
-            x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
+        if not os.path.exists(zip_f): gdown.download(url, zip_f, quiet=False)
+        if not os.path.exists(dir_f):
+            with zipfile.ZipFile(zip_f, 'r') as z: z.extractall(dir_f)
+        h5 = next((os.path.join(r, f) for r, d, fs in os.walk(dir_f) for f in fs if f.endswith(".h5")), None)
+        if h5:
+            base = tf.keras.applications.MobileNetV2(input_shape=(224,224,3), include_top=False, weights=None)
+            x = tf.keras.layers.GlobalAveragePooling2D()(base.output)
             x = tf.keras.layers.Dense(512, activation='relu')(x)
-            x = tf.keras.layers.Dropout(0.4)(x)
-            output = tf.keras.layers.Dense(24, activation='softmax')(x)
-            
-            model = tf.keras.Model(inputs=base_model.input, outputs=output)
-            
-            # 5. تحميل الأوزان مع تخطي الطبقات غير المتطابقة (لحل مشكلة 237 vs 4)
-            model.load_weights(h5_path, by_name=True, skip_mismatch=True)
+            out = tf.keras.layers.Dense(24, activation='softmax')(x)
+            model = tf.keras.Model(inputs=base.input, outputs=out)
+            model.load_weights(h5, by_name=True, skip_mismatch=True)
             return model
-    except Exception as e:
-        st.error(f"⚠️ عذراً، تعذر تشغيل المحرك: {e}")
-    return None
+    except Exception as e: st.error(f"Error: {e}"); return None
 
 model = load_ai_engine()
 
-# --- 3. واجهة المستخدم ---
-st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>خبير سلامة الجلد بالذكاء الاصطناعي 🧬</h1>", unsafe_allow_html=True)
+# --- 4. الواجهة والنتائج ---
+st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>🧬 نظام تشخيص أمراض الجلد الذكي</h1>", unsafe_allow_html=True)
 
-# خيارات اللغة والدليل
-col_top1, col_top2 = st.columns(2)
-with col_top1:
-    st.selectbox("🌐 اختر اللغة", ["العربية", "English"])
-with col_top2:
-    with st.expander("📖 الدليل الإرشادي"):
-        for i, name in DISEASES.items():
-            st.write(f"• {name}")
+col_in, col_res = st.columns([1, 1.2])
 
-st.divider()
+with col_in:
+    st.subheader("📸 إدخال الصورة")
+    input_file = st.camera_input("التقط صورة للإصابة") if st.toggle("استخدم الكاميرا") else st.file_uploader("ارفع صورة من الجهاز", type=["jpg", "png", "jpeg"])
 
-# منطقة رفع الصور والكاميرا
-tab1, tab2 = st.tabs(["📤 رفع صورة من الاستوديو", "📸 التقاط صورة بالكاميرا"])
-
-with tab1:
-    up_file = st.file_uploader("اختر صورة واضحة للإصابة", type=["jpg", "png", "jpeg"])
-with tab2:
-    cam_file = st.camera_input("التقط صورة مباشرة")
-
-active_source = up_file if up_file else cam_file
-
-if active_source:
-    col_img, col_res = st.columns([1, 1])
-    img = Image.open(active_source).convert('RGB')
-    
-    with col_img:
-        st.image(img, caption="الصورة التي سيتم فحصها", use_container_width=True)
-    
-    with col_res:
-        st.subheader("🔍 تحليل الحالة")
-        if st.button("بدء الفحص الآن"):
+with col_res:
+    st.subheader("🔍 التقرير الفني")
+    if input_file:
+        img = Image.open(input_file).convert('RGB')
+        st.image(img, use_container_width=True)
+        
+        if st.button("بدء الفحص السريع"):
             if model:
-                with st.spinner("⏳ جاري تحليل ملامح الجلد..."):
-                    # المعالجة المسبقة للصورة
-                    img_resized = cv2.resize(np.array(img), (224, 224))
-                    img_array = (img_resized.astype(np.float32) / 255.0)[np.newaxis, ...]
+                with st.spinner("⏳ جاري المطابقة مع قاعدة البيانات الطبية..."):
+                    img_arr = cv2.resize(np.array(img), (224, 224))
+                    img_arr = (img_arr.astype(np.float32) / 255.0)[np.newaxis, ...]
+                    preds = model.predict(img_arr)[0]
+                    idx = np.argmax(preds)
                     
-                    # عملية التنبؤ
-                    predictions = model.predict(img_array)
-                    class_idx = np.argmax(predictions[0])
-                    confidence = predictions[0][class_idx]
-                    
-                    # عرض النتيجة ببطاقة منسقة
+                    # استخراج المعلومات
+                    disease = DISEASES_DB.get(idx, {"name": "غير محدد", "status": "غير معروف"})
+                    status_class = "malignant" if "خبيث" in disease["status"] else "benign"
+
                     st.markdown(f"""
                     <div class="report-box">
-                        <h3 style="color:#1E3A8A;">النتيجة المتوقعة: {DISEASES.get(class_idx)}</h3>
-                        <p><b>نسبة الثقة:</b> {confidence:.2%}</p>
+                        <h3 style="color:#1E3A8A;">اسم المرض:</h3>
+                        <p style="font-size:1.4em; font-weight:bold;">{disease['name']}</p>
+                        <h3 style="color:#1E3A8A;">تصنيف الحالة:</h3>
+                        <div class="{status_class}">{disease['status']}</div>
+                        <p style="margin-top:10px;"><b>نسبة المطابقة:</b> {preds[idx]:.2%}</p>
                         <hr>
-                        <p style="font-size:0.8em; color:#555;">
-                        تنبيه: هذا الفحص استرشادي، يرجى مراجعة الطبيب المختص للتشخيص النهائي.
-                        </p>
+                        <p style="font-size:0.8em; color:#666;">⚠️ ملاحظة: هذا التقرير استرشادي، يرجى مراجعة الطبيب المختص.</p>
                     </div>
                     """, unsafe_allow_html=True)
-            else:
-                st.error("المحرك غير جاهز حالياً. يرجى الانتظار ثواني أو إعادة تشغيل التطبيق.")
-
-st.divider()
-st.caption("نظام Skin Safety System 2026 | تطوير لأغراض البحث العلمي")
