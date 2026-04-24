@@ -1,1 +1,6 @@
-
+tensorflow-cpu
+streamlit
+Pillow
+opencv-python-headless
+numpy
+requests
