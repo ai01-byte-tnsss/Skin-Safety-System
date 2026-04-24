@@ -7,134 +7,104 @@ import os
 import zipfile
 import gdown
 
-# --- 1. إعدادات الصفحة والهوية البصرية ---
-st.set_page_config(page_title="Skin Safety System", page_icon="🛡️", layout="wide")
+# --- 1. إعدادات الهوية البصرية ---
+st.set_page_config(page_title="Skin Safety AI", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
-    .main { background-color: #f0f2f6; }
-    .stButton>button { 
-        width: 100%; border-radius: 12px; height: 3.5em; 
-        background-color: #1E3A8A; color: white; font-weight: bold; font-size: 1.1em;
-        border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: 0.3s;
-    }
-    .stButton>button:hover { background-color: #2563EB; transform: translateY(-2px); }
-    .report-box { 
-        padding: 30px; border-radius: 20px; background-color: white; 
-        border-right: 12px solid #1E3A8A; box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-        margin-top: 10px;
-    }
-    .danger-badge { color: #D32F2F; background-color: #FFEBEE; padding: 10px 15px; border-radius: 10px; font-weight: bold; display: inline-block; }
-    .safe-badge { color: #388E3C; background-color: #E8F5E9; padding: 10px 15px; border-radius: 10px; font-weight: bold; display: inline-block; }
+    .report-box { padding: 30px; border-radius: 20px; background-color: white; border-right: 15px solid #1E3A8A; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+    .danger { color: #D32F2F; background-color: #FFEBEE; padding: 10px; border-radius: 10px; font-weight: bold; }
+    .safe { color: #388E3C; background-color: #E8F5E9; padding: 10px; border-radius: 10px; font-weight: bold; }
+    .stButton>button { width: 100%; border-radius: 12px; height: 3.5em; background-color: #1E3A8A; color: white; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. مصفوفة التصنيف المرتبة (Mapping Matrix) ---
-# مطابقة 100% مع ترتيب مجلداتك: akiec, bcc, bkl, df, mel, nv, vasc
-LABELS = {
-    0: {"id": "akiec", "name": "التقرن الضوئي (Actinic Keratosis)", "status": "خبيث جزئياً / متابعة"},
-    1: {"id": "bcc", "name": "سرطان الخلايا القاعدية (Basal Cell Carcinoma)", "status": "خبيث - يحتاج تدخل"},
-    2: {"id": "bkl", "name": "آفات التقرن الحميدة (Benign Keratosis)", "status": "حميد - غير مقلق"},
-    3: {"id": "df", "name": "الأورام الليفية الجلدية (Dermatofibroma)", "status": "حميد - زوائد ليفية"},
-    4: {"name": "الميلانوما (Melanoma)", "status": "خبيث جداً - مراجعة فورية!"},
-    5: {"name": "الشامات والوحمات (Melanocytic Nevi)", "status": "حميد - شامة طبيعية"},
-    6: {"name": "الآفات الوعائية (Vascular Lesions)", "status": "حميد - أوعية دموية"}
-}
+# --- 2. مصفوفة التشخيصات المرتبة أبجدياً (مطابقة لمجلداتك 100%) ---
+# الترتيب: akiec=0, bcc=1, bkl=2, df=3, mel=4, nv=5, vasc=6
+CLASS_NAMES = [
+    {"n": "التقرن الضوئي (Actinic Keratosis)", "s": "خبيث جزئياً / متابعة"},
+    {"n": "سرطان الخلايا القاعدية (BCC)", "s": "خبيث - يحتاج فحص"},
+    {"n": "آفات التقرن الحميدة (BKL)", "s": "حميد - غير مقلق"},
+    {"n": "الأورام الليفية الجلدية (DF)", "s": "حميد - زوائد ليفية"},
+    {"n": "الميلانوما - سرطان الجلد (Melanoma)", "s": "خبيث جداً - مراجعة فورية"},
+    {"n": "الشامات والوحمات (Nevus)", "s": "حميد - شامة طبيعية"},
+    {"n": "الآفات الوعائية (Vascular Lesions)", "s": "حميد - أوعية دموية"}
+]
 
-# --- 3. معالجة الصور المتقدمة ---
-def preprocess_skin_image(image):
-    img = np.array(image.convert('RGB'))
+# --- 3. معالجة الصورة الذكية ---
+def prepare_image(img):
+    img = np.array(img.convert('RGB'))
     img = cv2.resize(img, (224, 224))
-    # تنعيم الصورة لزيادة دقة التعرف على الحواف
-    img = cv2.GaussianBlur(img, (3, 3), 0)
+    # تقنية تحسين التباين لإبراز معالم المرض
+    img = cv2.detailEnhance(img, sigma_s=10, sigma_r=0.15)
     img = img.astype(np.float32) / 255.0
     return np.expand_dims(img, axis=0)
 
-# --- 4. تحميل المحرك الذكي (الحل الجذري) ---
+# --- 4. تحميل المحرك (مع حل مشكلة الـ Layer Mismatch) ---
 @st.cache_resource
-def load_expert_engine():
-    file_id = '1lMGCojHeGupFunhxX5GnLOiUgxWbbRC5'
-    h5_file = "validated_model.h5"
+def load_ai_model():
+    f_id = '1lMGCojHeGupFunhxX5GnLOiUgxWbbRC5'
+    path = "final_skin_model.h5"
+    if not os.path.exists(path):
+        gdown.download(f'https://drive.google.com/uc?id={f_id}', "model.zip", quiet=False)
+        with zipfile.ZipFile("model.zip", 'r') as z:
+            for f in z.namelist():
+                if f.endswith('.h5'):
+                    with open(path, "wb") as out: out.write(z.read(f))
+                    break
     
-    if not os.path.exists(h5_file):
-        try:
-            gdown.download(f'https://drive.google.com/uc?id={file_id}', "model.zip", quiet=False)
-            with zipfile.ZipFile("model.zip", 'r') as z:
-                for f in z.namelist():
-                    if f.endswith('.h5'):
-                        with open(h5_file, "wb") as out: out.write(z.read(f))
-                        break
-        except: return None
+    # بناء الهيكل الصريح لضمان عدم حدوث Mismatch
+    base = tf.keras.applications.MobileNetV2(input_shape=(224,224,3), include_top=False)
+    x = tf.keras.layers.GlobalAveragePooling2D()(base.output)
+    x = tf.keras.layers.Dense(512, activation='relu')(x)
+    # استخدام Softmax للتفرقة بين الـ 7 أنواع
+    out = tf.keras.layers.Dense(7, activation='softmax')(x)
+    model = tf.keras.Model(inputs=base.input, outputs=out)
+    model.load_weights(path, by_name=True, skip_mismatch=True)
+    return model
 
-    try:
-        # بناء الهيكل المتوافق مع عدد مجلداتك السبعة لضمان دقة Softmax
-        base = tf.keras.applications.MobileNetV2(input_shape=(224,224,3), include_top=False, weights=None)
-        x = tf.keras.layers.GlobalAveragePooling2D()(base.output)
-        x = tf.keras.layers.Dense(512, activation='relu')(x)
-        output = tf.keras.layers.Dense(7, activation='softmax')(x)
-        model = tf.keras.Model(inputs=base.input, outputs=output)
-        model.load_weights(h5_file, by_name=True, skip_mismatch=True)
-        return model
-    except:
-        return tf.keras.models.load_model(h5_file, compile=False)
+model = load_ai_model()
 
-model = load_expert_engine()
+# --- 5. الواجهة الرسومية ---
+st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>🧬 خبير تشخيص أمراض الجلد الذكي</h1>", unsafe_allow_html=True)
 
-# --- 5. بناء واجهة المستخدم ---
-st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>🧬 نظام الخبير الذكي لسلامة الجلد</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center;'>تحليل فوري وتصنيف دقيق للآفات الجلدية باستخدام مصفوفة Softmax</p>", unsafe_allow_html=True)
+col1, col2 = st.columns([1, 1.2], gap="large")
+
+with col1:
+    st.subheader("📸 عينة الفحص")
+    up = st.file_uploader("ارفع صورة من مجلدات bcc, mel, nv...", type=["jpg", "png", "jpeg"])
+    if up:
+        image = Image.open(up)
+        st.image(image, use_container_width=True, caption="الصورة الأصلية")
+
+with col2:
+    st.subheader("🔍 تقرير المختبر الذكي")
+    if up and st.button("🚀 ابدأ تحليل الأنسجة"):
+        if model:
+            with st.spinner("⏳ جاري استخراج الخصائص الحيوية..."):
+                processed = prepare_image(image)
+                # تنفيذ التوقع الرياضي
+                preds = model.predict(processed)[0]
+                # اختيار الفئة الأعلى يقيناً
+                idx = np.argmax(preds)
+                
+                res = CLASS_NAMES[idx]
+                style = "danger" if "خبيث" in res['s'] else "safe"
+
+                # عرض النتيجة بشكل مرتب وتنسيق HTML نظيف
+                st.markdown(f"""
+                <div class="report-box">
+                    <h3 style="color:#1E3A8A;">اسم المرض المتوقع:</h3>
+                    <p style="font-size:1.8em; font-weight:bold;">{res['n']}</p>
+                    <h3 style="color:#1E3A8A;">تصنيف الحالة:</h3>
+                    <div class="{style}">{res['s']}</div>
+                    <p style="margin-top:20px; font-size:1.1em;"><b>دقة المطابقة:</b> {preds[idx]:.2%}</p>
+                    <hr>
+                    <p style="font-size:0.85em; color:gray;">⚠️ تنبيه: هذا التشخيص آلي استرشادي، يجب استشارة الطبيب المختص.</p>
+                </div>
+                """, unsafe_allow_html=True)
 
 st.divider()
-
-col_up, col_res = st.columns([1, 1.3], gap="large")
-
-with col_up:
-    st.subheader("📸 إدخال عينة الفحص")
-    use_cam = st.toggle("🎥 تشغيل الكاميرا المباشرة")
-    file = st.camera_input("التقط صورة") if use_cam else st.file_uploader("📤 ارفع صورة من الـ Dataset", type=["jpg", "png", "jpeg"])
-    
-    if file:
-        img_display = Image.open(file)
-        st.image(img_display, caption="العينة المراد فحصها", use_container_width=True)
-
-with col_res:
-    st.subheader("🔍 التقرير التحليلي النهائي")
-    if file:
-        if st.button("🚀 بدء تحليل الخصائص المورفولوجية"):
-            if model:
-                with st.spinner("⏳ جاري مطابقة الأنماط مع الفئات السبع..."):
-                    # 1. المعالجة
-                    proc_img = preprocess_skin_image(img_display)
-                    # 2. التنبؤ
-                    predictions = model.predict(proc_img)[0]
-                    # 3. اختيار النتيجة الأقوى
-                    idx = np.argmax(predictions)
-                    accuracy = predictions[idx]
-                    
-                    # 4. جلب البيانات والتنسيق
-                    data = LABELS.get(idx, {"name": "غير محدد", "status": "فحص سريري مطلوب"})
-                    badge_class = "danger-badge" if "خبيث" in data['status'] else "safe-badge"
-
-                    st.markdown(f"""
-                    <div class="report-box">
-                        <h3 style="color:#1E3A8A; margin-bottom:10px;">اسم المرض المتوقع:</h3>
-                        <p style="font-size:1.7em; font-weight:bold; margin-bottom:20px;">{data['name']}</p>
-                        
-                        <h3 style="color:#1E3A8A; margin-bottom:10px;">التصنيف الطبي للحالة:</h3>
-                        <div class="{badge_class}">{data['status']}</div>
-                        
-                        <div style="margin-top:25px; border-top:1px solid #eee; padding-top:15px;">
-                            <p style="font-size:1.1em;"><b>دقة المطابقة الرقمية:</b> <span style="color:#1E3A8A; font-weight:bold;">{accuracy:.2%}</span></p>
-                        </div>
-                        <p style="font-size:0.8em; color:gray; margin-top:20px;">
-                        ⚠️ ملاحظة: هذا النظام يعتمد على الذكاء الاصطناعي لمساعدة الأطباء ولا يغني عن الخزعة الطبية.
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.error("فشل في تحميل محرك الذكاء الاصطناعي. تأكد من رابط الأوزان.")
-
-st.divider()
-st.caption("نظام Skin AI Expert © 2026 | تطوير لأغراض التشخيص المتقدم")
+st.caption("نظام Skin Safety AI © 2026 | النسخة المحدثة لفرز الـ 7 فئات")
