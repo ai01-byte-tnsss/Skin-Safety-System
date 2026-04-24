@@ -7,10 +7,10 @@ import numpy as np
 import cv2
 import os
 
-# --- 1. إعدادات الصفحة ---
+# --- إعدادات الصفحة ---
 st.set_page_config(page_title="Skin AI Expert System", layout="wide")
 
-# --- 2. الدليل المرجعي لـ 24 صنف (مطابق لترتيب التدريب الخاص بك) ---
+# --- الدليل المرجعي لـ 24 صنف (مرتب حسب نتائج تدريبك) ---
 MEDICAL_INFO = {
     0: {"n": "Acne and Rosacea", "s": "✅ حالة شائعة", "c": "#34C759", "d": "حب الشباب والوردية؛ حالات تتعلق بانسداد المسام والتهاب الغدد الدهنية."},
     1: {"n": "Actinic Keratosis / BCC", "s": "🚨 خبيث / ما قبل سرطاني", "c": "#FF3B30", "d": "تقرن ضوئي أو سرطان الخلايا القاعدية؛ يتطلب استشارة طبية فورية."},
@@ -38,100 +38,86 @@ MEDICAL_INFO = {
     23: {"n": "Archive / Other", "s": "🔍 غير محدد", "c": "#8E8E93", "d": "حالات غير مصنفة حالياً ضمن القائمة الرئيسية."},
 }
 
-# --- 3. حل مشكلة الملفات: تجميع وتحميل النموذج الهجين ---
+# --- دالة تجميع وتحميل النموذج الهجين ---
 @st.cache_resource
 def load_system_model():
-    # أسماء الأجزاء كما هي في مستودع GitHub الخاص بك
-    parts = [
-        "skin_expert_hybrid_24ch.z01", 
-        "skin_expert_hybrid_24ch.z02", 
-        "skin_expert_hybrid_24ch.z03"
-    ]
-    
-    # اسم الملف المدمج المؤقت
-    temp_h5 = "model_assembled_final.h5"
+    parts = ["skin_expert_hybrid_24ch.z01", "skin_expert_hybrid_24ch.z02", "skin_expert_hybrid_24ch.z03"]
+    temp_h5 = "final_assembled_model.h5"
     
     try:
-        # 1. تجميع الأجزاء
+        # دمج الأجزاء بايت ببايت لضمان سلامة الملف
         with open(temp_h5, "wb") as outfile:
             for part in parts:
                 if os.path.exists(part):
                     with open(part, "rb") as infile:
                         outfile.write(infile.read())
                 else:
-                    st.error(f"❌ الملف {part} غير موجود في المستودع!")
+                    st.error(f"الملف {part} مفقود!")
                     return None
         
-        # 2. بناء الهيكل (يجب أن يطابق تماماً النموذج الذي تدرب)
-        base1 = tf.keras.applications.EfficientNetB0(weights=None, include_top=False, input_shape=(224, 224, 3))
-        base2 = tf.keras.applications.MobileNetV2(weights=None, include_top=False, input_shape=(224, 224, 3))
+        # بناء الهيكل الهجين
+        b1 = tf.keras.applications.EfficientNetB0(weights=None, include_top=False, input_shape=(224, 224, 3))
+        b2 = tf.keras.applications.MobileNetV2(weights=None, include_top=False, input_shape=(224, 224, 3))
+        c = Concatenate()([GlobalAveragePooling2D()(b1.output), GlobalAveragePooling2D()(b2.output)])
+        d = Dense(512, activation='relu')(c)
+        o = Dense(24, activation='softmax')(Dropout(0.4)(d))
         
-        combined = Concatenate()([GlobalAveragePooling2D()(base1.output), GlobalAveragePooling2D()(base2.output)])
-        x = Dense(512, activation='relu')(combined)
-        outputs = Dense(24, activation='softmax')(Dropout(0.4)(x))
+        full_model = Model(inputs=[b1.input, b2.input], outputs=o)
         
-        model = Model(inputs=[base1.input, base2.input], outputs=outputs)
-        
-        # 3. تحميل الأوزان من الملف المجمع
-        model.load_weights(temp_h5)
-        return model
-
+        # تحميل الأوزان
+        full_model.load_weights(temp_h5)
+        return full_model
     except Exception as e:
-        st.error(f"⚠️ خطأ في تحميل النموذج: {str(e)}")
+        st.error(f"خطأ في تحميل النموذج: {e}")
         return None
 
 model = load_system_model()
 
-# --- 4. واجهة المستخدم ---
+# --- واجهة المستخدم ---
 st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>نظام فحص الجلد الذكي - 24 صنف</h1>", unsafe_allow_html=True)
+st.write("---")
 
-uploaded_file = st.file_uploader("📥 ارفع صورة الجلد للفحص", type=["jpg", "png", "jpeg"])
+file = st.file_uploader("📥 ارفع صورة الجلد للفحص", type=["jpg", "png", "jpeg"])
 
-if uploaded_file and model:
-    img = Image.open(uploaded_file).convert('RGB')
-    st.image(img, width=350, caption="الصورة المرفوعة")
+if file and model:
+    img = Image.open(file).convert('RGB')
+    col1, col2 = st.columns([1, 1])
     
-    if st.button("🔍 تحليل الحالة الآن"):
-        with st.spinner("⏳ جاري المعالجة الرقمية..."):
-            # تجهيز الصورة
-            img_np = np.array(img)
-            img_res = cv2.resize(img_np, (224, 224))
-            
-            # تحسين التباين (CLAHE)
+    with col1:
+        st.image(img, caption="الصورة المرفوعة", use_container_width=True)
+    
+    if st.button("🔍 بدء التحليل الرقمي"):
+        with st.spinner("⏳ جاري تحليل الأنماط..."):
+            # معالجة الصورة
+            img_res = cv2.resize(np.array(img), (224, 224))
+            # تحسين التباين (CLAHE) لزيادة الدقة
             lab = cv2.cvtColor(img_res, cv2.COLOR_RGB2LAB)
             l, a, b = cv2.split(lab)
-            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-            img_proc = cv2.merge((clahe.apply(l), a, b))
-            img_proc = cv2.cvtColor(img_proc, cv2.COLOR_LAB2RGB)
+            l = cv2.createCLAHE(clipLimit=3.0).apply(l)
+            img_proc = cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2RGB)
             
-            inp = img_proc.astype(np.float32) / 255.0
-            inp = np.expand_dims(inp, axis=0)
+            inp = (img_proc.astype(np.float32) / 255.0)[np.newaxis, ...]
             
             # التنبؤ
             preds = model.predict([inp, inp])[0]
             idx = np.argmax(preds)
             conf = preds[idx]
-            
             res = MEDICAL_INFO[idx]
             
-            # --- تطبيق منطق النسب (0.40 للخبيث و 0.45 للحميد) ---
-            is_serious = "🚨" in res['s']
-            is_benign = "✅" in res['s']
+            # تطبيق شروط النسب (0.40 خبيث، 0.45 حميد)
+            is_serious = "🚨" in res['s'] or "⚠️" in res['s']
+            threshold = 0.40 if is_serious else 0.45
             
-            show = False
-            if is_serious and conf >= 0.40: show = True
-            elif is_benign and conf >= 0.45: show = True
-            elif conf >= 0.35: show = True # للحالات الأخرى
-            
-            if show:
-                st.markdown(f"""
-                <div style="padding:20px; border-radius:10px; border-right:15px solid {res['c']}; background-color:#f9f9f9; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
-                    <h2 style="color:{res['c']};">{res['n']}</h2>
-                    <h3>التصنيف: {res['s']}</h3>
-                    <p style="font-size:1.2em;"><b>نسبة الثقة:</b> {conf:.2%}</p>
-                    <hr>
-                    <p style="line-height:1.6;">{res['d']}</p>
-                </div>
-                """, unsafe_allow_html=True)
+            if conf >= threshold:
+                with col2:
+                    st.markdown(f"""
+                    <div style="padding:20px; border-radius:10px; border-right:15px solid {res['c']}; background-color:#f8f9fa;">
+                        <h2 style="color:{res['c']};">{res['n']}</h2>
+                        <h4>التصنيف: {res['s']}</h4>
+                        <p style="font-size:1.2em;"><b>نسبة الثقة:</b> {conf:.2%}</p>
+                        <hr>
+                        <p>{res['d']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
             else:
-                st.warning("⚠️ الصورة غير واضحة بما يكفي لتشخيص دقيق، يرجى إعادة التصوير.")
+                st.warning("⚠️ الصورة غير واضحة بما يكفي لاتخاذ قرار دقيق.")
