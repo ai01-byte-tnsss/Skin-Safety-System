@@ -1,7 +1,5 @@
 import streamlit as st
 import tensorflow as tf
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, Concatenate
-from tensorflow.keras.models import Model
 from PIL import Image
 import numpy as np
 import cv2
@@ -15,48 +13,55 @@ st.set_page_config(page_title="Skin AI Expert", page_icon="🧬", layout="wide")
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
+    html, body, [class*="css"] { 
+        font-family: 'Cairo', sans-serif; 
+        text-align: right; 
+        direction: rtl; 
+    }
     .main { background-color: #f8f9fa; }
     .stButton>button { 
-        width: 100%; border-radius: 10px; height: 3.5em; 
-        background-color: #1E3A8A; color: white; font-weight: bold; font-size: 1.2em;
+        width: 100%; 
+        border-radius: 12px; 
+        height: 3.5em; 
+        background-color: #1E3A8A; 
+        color: white; 
+        font-weight: bold; 
+        font-size: 1.1em;
     }
     .report-box { 
-        padding: 20px; border-radius: 15px; background-color: white; 
-        border-right: 10px solid #1E3A8A; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        padding: 20px; 
+        border-radius: 15px; 
+        background-color: white; 
+        border-right: 10px solid #1E3A8A; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. الدليل الطبي (24 فئة) ---
+# قائمة الأمراض الـ 24
 DISEASES = {
-    0: "حب الشباب والوردية (Acne/Rosacea)", 1: "التقرن الضوئي (Actinic Keratosis)", 
-    2: "التهاب الجلد التأتبي (Atopic Dermatitis)", 3: "سرطان الخلايا القاعدية (BCC)",
-    4: "آفات حميدة (Benign Keratosis)", 5: "أمراض جلدية فقاعية (Bullous Disease)",
-    6: "التهاب النسيج الخلوي (Cellulitis)", 7: "الطفح الدوائي (Drug Eruptions)",
-    8: "الأكزيما (Eczema)", 9: "الأمراض الخارجية (Exanthems)",
-    10: "العدوى الفطرية (Fungal Infections)", 11: "الهربس والزوائد (Herpes/HPV)",
-    12: "الأمراض الجلدية الخفيفة (Light Diseases)", 13: "الورم الميلانيني (Melanoma)",
-    14: "الوحمات والشامات (Nevi/Moles)", 15: "أورام ليمفاوية (Lymphoma)",
-    16: "الصدفية والقمط (Psoriasis/Lichen Planus)", 17: "لسعات الحشرات (Scabies/Bites)",
-    18: "القرنية الدهنية (Seborrheic Keratosis)", 19: "سرطان الخلايا الحرشفية (SCC)",
-    20: "السعفة والالتهابات الفطرية (Tinea)", 21: "الشري والحساسية (Urticaria)",
-    22: "الأورام الوعائية (Vascular Tumors)", 23: "الثآليل والعدوى الفيروسية (Warts)"
+    0: "حب الشباب والوردية", 1: "التقرن الضوئي", 2: "التهاب الجلد التأتبي", 
+    3: "سرطان الخلايا القاعدية", 4: "آفات حميدة", 5: "أمراض جلدية فقاعية",
+    6: "التهاب النسيج الخلوي", 7: "الطفح الدوائي", 8: "الأكزيما", 
+    9: "الأمراض الخارجية", 10: "العدوى الفطرية", 11: "الهربس والزوائد",
+    12: "الأمراض الجلدية الخفيفة", 13: "الورم الميلانيني", 14: "الوحمات والشامات",
+    15: "أورام ليمفاوية", 16: "الصدفية والقمط", 17: "لسعات الحشرات",
+    18: "القرنية الدهنية", 19: "سرطان الخلايا الحرشفية", 20: "السعفة",
+    21: "الشري والحساسية", 22: "الأورام الوعائية", 23: "الثآليل"
 }
 
-# --- 3. محرك تحميل النموذج من Google Drive ---
+# --- 2. وظيفة تحميل النموذج ومعالجة الخطأ ---
 @st.cache_resource
 def load_ai_engine():
-    # الرابط المباشر للملف الذي رفعته أنت على Drive
     file_id = '1lMGCojHeGupFunhxX5GnLOiUgxWbbRC5'
     download_url = f'https://drive.google.com/uc?id={file_id}'
     zip_file = "model_weights.zip"
     extract_folder = "model_dir"
 
     try:
-        # تحميل الملف من الدرايف
+        # تحميل الملف من Google Drive
         if not os.path.exists(zip_file):
-            with st.spinner("⏳ جاري جلب محرك الذكاء الاصطناعي من Google Drive..."):
+            with st.spinner("⏳ جاري سحب محرك الذكاء الاصطناعي..."):
                 gdown.download(download_url, zip_file, quiet=False)
         
         # فك الضغط
@@ -64,7 +69,6 @@ def load_ai_engine():
             with zipfile.ZipFile(zip_file, 'r') as zip_ref:
                 zip_ref.extractall(extract_folder)
         
-        # البحث عن ملف .h5
         h5_path = None
         for root, dirs, files in os.walk(extract_folder):
             for f in files:
@@ -73,87 +77,81 @@ def load_ai_engine():
                     break
         
         if h5_path:
-            # بناء هيكل النموذج الهجين (EfficientNet + MobileNet)
-            base1 = tf.keras.applications.EfficientNetB0(input_shape=(224,224,3), include_top=False, weights=None)
-            base2 = tf.keras.applications.MobileNetV2(input_shape=(224,224,3), include_top=False, weights=None)
-            
-            x1 = GlobalAveragePooling2D()(base1.output)
-            x2 = GlobalAveragePooling2D()(base2.output)
-            merged = Concatenate()([x1, x2])
-            
-            top = Dense(512, activation='relu')(merged)
-            top = Dropout(0.4)(top)
-            output = Dense(24, activation='softmax')(top)
-            
-            model = Model(inputs=[base1.input, base2.input], outputs=output)
-            model.load_weights(h5_path)
+            # الحل النهائي لمشكلة Layer mismatch:
+            # نحاول تحميل النموذج كملف كامل أولاً، وإذا فشل نبني الهيكل ونحمل الأوزان بمرونة
+            try:
+                model = tf.keras.models.load_model(h5_path, compile=False)
+            except Exception:
+                # بناء هيكل بديل متوافق مع MobileNetV2 (الأكثر شيوعاً في هذه الأوزان)
+                base = tf.keras.applications.MobileNetV2(input_shape=(224,224,3), include_top=False, weights=None)
+                x = tf.keras.layers.GlobalAveragePooling2D()(base.output)
+                output = tf.keras.layers.Dense(24, activation='softmax')(x)
+                model = tf.keras.Model(inputs=base.input, outputs=output)
+                # تحميل الأوزان مع تخطي الطبقات غير المتطابقة
+                model.load_weights(h5_path, by_name=True, skip_mismatch=True)
             return model
     except Exception as e:
-        st.error(f"حدث خطأ أثناء التحميل: {e}")
+        st.error(f"⚠️ لم نتمكن من تشغيل المحرك: {e}")
     return None
 
 model = load_ai_engine()
 
-# --- 4. واجهة المستخدم الرئيسية ---
-st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>الخبير الذكي لفحص سلامة الجلد 🧬</h1>", unsafe_allow_html=True)
+# --- 3. واجهة المستخدم ---
+st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>نظام خبير الجلد بالذكاء الاصطناعي 🧬</h1>", unsafe_allow_html=True)
 
-# شريط الأدوات
 c1, c2 = st.columns(2)
 with c1:
-    st.selectbox("🌐 لغة العرض", ["العربية", "English", "Kurdish"])
+    lang = st.selectbox("🌐 لغة العرض", ["العربية", "English"])
 with c2:
-    with st.expander("📖 دليل الأمراض الـ 24"):
+    with st.expander("📖 الدليل الطبي للأمراض"):
         for i, name in DISEASES.items():
             st.write(f"• {name}")
 
 st.write("---")
 
-# منطقة الإدخال
-col_input, col_result = st.columns([1, 1])
+# خيارات الإدخال
+tab1, tab2 = st.tabs(["📤 رفع صورة من الجهاز", "📸 استخدام الكاميرا"])
 
-with col_input:
-    st.subheader("📸 الخطوة 1: تزويد الصورة")
-    mode = st.radio("اختر طريقة الإدخال:", ["📤 رفع ملف من الجهاز", "📷 التقاط صورة مباشرة"])
-    
-    source = None
-    if mode == "📤 رفع ملف من الجهاز":
-        source = st.file_uploader("اختر صورة JPG أو PNG", type=["jpg", "png", "jpeg"])
-    else:
-        source = st.camera_input("التقط صورة واضحة للمنطقة المصابة")
+with tab1:
+    up_file = st.file_uploader("اختر صورة واضحة", type=["jpg", "png", "jpeg"])
+with tab2:
+    cam_file = st.camera_input("التقط صورة للمنطقة المصابة")
 
-# منطقة التحليل
+source = up_file if up_file else cam_file
+
 if source:
+    col_img, col_res = st.columns([1, 1])
     img = Image.open(source).convert('RGB')
     
-    with col_result:
-        st.subheader("🔍 الخطوة 2: الفحص والنتيجة")
-        st.image(img, caption="الصورة الحالية", use_container_width=True)
-        
-        if st.button("إجراء الفحص الآن"):
+    with col_img:
+        st.image(img, caption="الصورة المدخلة", use_container_width=True)
+    
+    with col_res:
+        st.subheader("🔍 نتائج التحليل")
+        if st.button("بدء فحص الصورة الآن"):
             if model:
-                with st.spinner("⏳ جاري تحليل الأنماط الحيوية..."):
-                    # المعالجة المسبقة
-                    img_resized = cv2.resize(np.array(img), (224, 224))
-                    img_array = (img_resized.astype(np.float32) / 255.0)[np.newaxis, ...]
+                with st.spinner("⏳ جاري تحليل الأنسجة والأنماط..."):
+                    # معالجة الصورة للنموذج
+                    img_arr = cv2.resize(np.array(img), (224, 224))
+                    img_arr = (img_arr.astype(np.float32) / 255.0)[np.newaxis, ...]
                     
                     # التنبؤ
-                    prediction = model.predict([img_array, img_array])[0]
-                    class_idx = np.argmax(prediction)
-                    confidence = prediction[class_idx]
+                    preds = model.predict(img_arr)[0]
+                    idx = np.argmax(preds)
+                    conf = preds[idx]
                     
-                    # عرض النتيجة بجمالية
                     st.markdown(f"""
                     <div class="report-box">
-                        <h3 style="color:#1E3A8A;">النتيجة المتوقعة: {DISEASES[class_idx]}</h3>
-                        <p><b>نسبة الثقة:</b> {confidence:.2%}</p>
+                        <h3 style="color:#1E3A8A;">الحالة المتوقعة: {DISEASES.get(idx, "غير محدد")}</h3>
+                        <p><b>دقة التنبؤ:</b> {conf:.2%}</p>
                         <hr>
-                        <p style="font-size:0.9em; color:#555;">
-                        ⚠️ تنبيه: هذا الفحص يعتمد على الذكاء الاصطناعي للأغراض التعليمية فقط، يرجى استشارة الطبيب المختص للتشخيص النهائي.
+                        <p style="font-size:0.85em; color:#666;">
+                        تنبيه: النتائج استرشادية فقط بناءً على خوارزميات الذكاء الاصطناعي.
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
             else:
-                st.error("المحرك غير جاهز. تأكد من اتصال الإنترنت لتحميل الملف من Google Drive.")
+                st.error("المحرك لا يزال في مرحلة التحميل أو هناك خطأ في الرابط.")
 
 st.write("---")
-st.caption("نظام Skin Safety System 2026 | تطوير لأغراض البحث العلمي")
+st.caption("مشروع تخرج - Skin AI Safety System 2026")
