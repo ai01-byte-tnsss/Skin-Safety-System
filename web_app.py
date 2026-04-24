@@ -9,9 +9,22 @@ import os
 import zipfile
 
 # --- 1. إعدادات الصفحة ---
-st.set_page_config(page_title="Skin AI Expert System", page_icon="🧬", layout="wide")
+st.set_page_config(
+    page_title="Skin AI Expert System",
+    page_icon="🧬",
+    layout="wide"
+)
 
-# --- 2. الدليل المرجعي (نفس القائمة السابقة) ---
+# تحسين مظهر الواجهة
+st.markdown("""
+    <style>
+    .main { background-color: #f8f9fa; }
+    .stButton>button { width: 100%; border-radius: 8px; height: 3em; background-color: #1E3A8A; color: white; font-weight: bold; }
+    div[data-testid="stMarkdownContainer"] > p { text-align: right; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 2. الدليل المرجعي للأمراض (24 صنف) ---
 MEDICAL_INFO = {
     0: {"n": "Acne and Rosacea", "s": "✅ حالة شائعة", "c": "#34C759", "d": "حب الشباب والوردية؛ حالات تتعلق بانسداد المسام والتهاب الغدد الدهنية."},
     1: {"n": "Actinic Keratosis / BCC", "s": "🚨 خبيث / ما قبل سرطاني", "c": "#FF3B30", "d": "تقرن ضوئي أو سرطان الخلايا القاعدية؛ يتطلب استشارة طبية فورية."},
@@ -39,89 +52,105 @@ MEDICAL_INFO = {
     23: {"n": "Archive / Other", "s": "🔍 غير محدد", "c": "#8E8E93", "d": "حالات مؤرشفة أو غير مصنفة حالياً."},
 }
 
-# --- 3. دالة فك الضغط وتحميل النموذج ---
+# --- 3. دالة معالجة الـ ZIP وتحميل النموذج ---
 @st.cache_resource
-def load_system_model():
+def load_expert_model():
     zip_path = "skin_expert_hybrid_24ch.zip"
-    extract_to = "temp_model_dir"
+    extract_dir = "extracted_model"
     
     try:
-        # 1. فك ضغط الملف
+        # 1. فك ضغط الملف إذا وجد
         if os.path.exists(zip_path):
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_to)
+                zip_ref.extractall(extract_dir)
         else:
-            st.error("❌ ملف الـ ZIP مفقود!")
+            st.error(f"❌ ملف {zip_path} غير موجود!")
             return None
 
-        # 2. البحث عن ملف الأوزان (h5) داخل المجلد المفكوك
-        h5_file = None
-        for root, dirs, files in os.walk(extract_to):
-            for file in files:
-                if file.endswith(".h5"):
-                    h5_file = os.path.join(root, file)
+        # 2. البحث التلقائي عن ملف الـ .h5
+        h5_path = None
+        for root, dirs, files in os.walk(extract_dir):
+            for f in files:
+                if f.endswith(".h5"):
+                    h5_path = os.path.join(root, f)
                     break
         
-        if not h5_file:
-            st.error("❌ لم يتم العثور على ملف أوزان .h5 داخل ملف الـ ZIP!")
+        if not h5_path:
+            st.error("❌ لم يتم العثور على ملف الأوزان (.h5) داخل الـ ZIP.")
             return None
 
-        # 3. بناء هيكل النموذج
-        base_1 = tf.keras.applications.EfficientNetB0(weights=None, include_top=False, input_shape=(224, 224, 3))
-        base_2 = tf.keras.applications.MobileNetV2(weights=None, include_top=False, input_shape=(224, 224, 3))
+        # 3. بناء هيكل الشبكة الهجين (Hybrid Architecture)
+        base1 = tf.keras.applications.EfficientNetB0(weights=None, include_top=False, input_shape=(224, 224, 3))
+        base2 = tf.keras.applications.MobileNetV2(weights=None, include_top=False, input_shape=(224, 224, 3))
         
-        c = Concatenate()([GlobalAveragePooling2D()(base_1.output), GlobalAveragePooling2D()(base_2.output)])
-        d = Dense(512, activation='relu')(c)
-        o = Dense(24, activation='softmax')(Dropout(0.4)(d))
+        merge = Concatenate()([GlobalAveragePooling2D()(base1.output), GlobalAveragePooling2D()(base2.output)])
+        dense = Dense(512, activation='relu')(merge)
+        drop = Dropout(0.4)(dense)
+        output = Dense(24, activation='softmax')(drop)
         
-        full_model = Model(inputs=[base_1.input, base_2.input], outputs=o)
+        model = Model(inputs=[base1.input, base2.input], outputs=output)
         
-        # 4. تحميل الأوزان
-        full_model.load_weights(h5_file)
-        return full_model
-
+        # 4. تحميل الأوزان من الملف المستخرج
+        model.load_weights(h5_path)
+        return model
     except Exception as e:
-        st.error(f"⚠️ خطأ أثناء تحميل النموذج من ZIP: {e}")
+        st.error(f"⚠️ فشل تقني: {e}")
         return None
 
-model = load_system_model()
+# تشغيل دالة التحميل
+model = load_expert_model()
 
-# --- 4. واجهة المستخدم (نفس المنطق السابق) ---
-st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>الذكاء الاصطناعي لفحص سلامة الجلد</h1>", unsafe_allow_html=True)
+# --- 4. واجهة المستخدم ---
+st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>نظام خبير الجلد بالذكاء الاصطناعي 🧬</h1>", unsafe_allow_html=True)
 st.write("---")
 
-file = st.file_uploader("📥 ارفع صورة الجلد (JPG, PNG)", type=["jpg", "png", "jpeg"])
+# رفع الصورة
+uploaded_file = st.file_uploader("📥 ارفع صورة الجلد المصاب للتحليل (JPG/PNG)", type=["jpg", "png", "jpeg"])
 
-if file and model:
-    img = Image.open(file).convert('RGB')
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        st.image(img, caption="الصورة المرفوعة", use_container_width=True)
-    
-    if st.button("🔍 بدء التحليل الرقمي"):
-        with st.spinner("⏳ جاري تحليل الأنماط..."):
-            img_res = cv2.resize(np.array(img), (224, 224))
-            inp = (img_res.astype(np.float32) / 255.0)[np.newaxis, ...]
-            
-            preds = model.predict([inp, inp])[0]
-            idx = np.argmax(preds)
-            conf = preds[idx]
-            res = MEDICAL_INFO.get(idx, MEDICAL_INFO[23])
-            
-            is_serious = "🚨" in res['s']
-            threshold = 0.40 if is_serious else 0.45
-            
-            if conf >= threshold:
-                with col2:
-                    st.markdown(f"""
-                    <div style="padding:20px; border-radius:10px; border-right:15px solid {res['c']}; background-color:#f8f9fa; direction:rtl; text-align:right;">
-                        <h2 style="color:{res['c']};">{res['n']}</h2>
-                        <h4>التصنيف: {res['s']}</h4>
-                        <p style="font-size:1.2em;"><b>دقة التنبؤ:</b> {conf:.2%}</p>
-                        <hr>
-                        <p>{res['d']}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.warning("⚠️ دقة التنبؤ منخفضة. يرجى محاولة رفع صورة أوضح.")
+if uploaded_file:
+    if model is None:
+        st.error("المحرك الذكي غير جاهز. تأكد من سلامة ملف الـ ZIP.")
+    else:
+        # عرض الصورة المرفوعة
+        img = Image.open(uploaded_file).convert('RGB')
+        c1, c2 = st.columns([1, 1])
+        
+        with c1:
+            st.image(img, caption="الصورة الأصلية", use_container_width=True)
+        
+        if st.button("🔍 تحليل الصورة الآن"):
+            with st.spinner("⏳ يتم الآن مطابقة الأنماط الحيوية..."):
+                # معالجة الصورة
+                img_array = np.array(img)
+                img_res = cv2.resize(img_array, (224, 224))
+                img_tensor = (img_res.astype(np.float32) / 255.0)[np.newaxis, ...]
+                
+                # التنبؤ (مدخلان متطابقان للنموذج الهجين)
+                predictions = model.predict([img_tensor, img_tensor])[0]
+                idx = np.argmax(predictions)
+                confidence = predictions[idx]
+                
+                # جلب معلومات الحالة
+                info = MEDICAL_INFO.get(idx, MEDICAL_INFO[23])
+                
+                # عتبة الثقة (Threshold)
+                is_serious = "🚨" in info['s']
+                req_conf = 0.40 if is_serious else 0.45
+                
+                if confidence >= req_conf:
+                    with c2:
+                        st.markdown(f"""
+                        <div style="padding:25px; border-radius:15px; border-right:12px solid {info['c']}; background-color:#ffffff; direction:rtl; text-align:right; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            <h2 style="color:{info['c']};">{info['n']}</h2>
+                            <h4 style="color:#444;">حالة التشخيص: {info['s']}</h4>
+                            <p style="font-size:1.2em; color:#1E3A8A;"><b>نسبة الثقة:</b> {confidence:.2%}</p>
+                            <hr>
+                            <p style="line-height:1.6;">{info['d']}</p>
+                            <p style="color:red; font-size:0.8em; margin-top:15px;">* هذا التحليل استرشادي فقط، يرجى استشارة طبيب مختص فوراً.</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.warning(f"⚠️ النتيجة غير مؤكدة ({confidence:.1%}). يرجى التقاط صورة أوضح وتحت إضاءة أفضل.")
+
+st.write("---")
+st.caption("نظام Skin Safety System V2.0 - 2026")
