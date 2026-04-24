@@ -57,11 +57,7 @@ c1, c2 = st.columns(2)
 with c1:
     m = st.radio("", [t['upload'], t['cam']], horizontal=True)
     file = st.file_uploader("", type=["jpg", "png", "jpeg"]) if "ارفع" in m or "Upload" in m else st.camera_input("")
-
-if file:
-    img = Image.open(file).convert('RGB')
-    with c2: st.image(img, use_container_width=True)
-        if st.button(t['btn']):
+if st.button(t['btn']):
         with st.spinner("⏳ Analyzing..."):
             img_np = np.array(img)
             img_res = cv2.resize(img_np, (224, 224))
@@ -120,3 +116,6 @@ selected_info = st.selectbox("اختر فئة لعرض التفاصيل:", [v['n
 for k, v in MEDICAL_INFO.items():
     if v['n'] == selected_info:
         st.markdown(f"<div style='background-color:{v['c']}10; padding:20px; border-right:10px solid {v['c']};'><h3>{v['n']}</h3><p>{v['d']}</p></div>", unsafe_allow_html=True)
+if file:
+    img = Image.open(file).convert('RGB')
+    with c2: st.image(img, use_container_width=True)
