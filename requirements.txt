@@ -1,7 +1,6 @@
-streamlit
-tensorflow
-Pillow
-numpy
-opencv-python-headless
-requests
-
+scikit-image
+albumentations
+shap
+tf-explain
+onnxruntime
+loguru  # لمراقبة الأخطاء (Logging) بدلاً من print
