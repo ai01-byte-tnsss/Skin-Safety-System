@@ -2,5 +2,4 @@ streamlit
 tensorflow
 Pillow
 numpy
-opencv-python-headless
-requests
+
