@@ -7,50 +7,41 @@ import os
 import zipfile
 import gdown
 
-# --- 1. إعدادات الصفحة والتنسيق العربي ---
-st.set_page_config(page_title="Skin AI Expert", page_icon="🧬", layout="wide")
+# --- 1. إعدادات الصفحة والتنسيق ---
+st.set_page_config(page_title="Skin AI Expert System", page_icon="🧬", layout="wide")
 
+# تنسيق الواجهة ودعم اللغة العربية
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [class*="css"] { 
-        font-family: 'Cairo', sans-serif; 
-        text-align: right; 
-        direction: rtl; 
-    }
-    .main { background-color: #f8f9fa; }
+    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
+    .main { background-color: #f0f2f6; }
     .stButton>button { 
-        width: 100%; 
-        border-radius: 12px; 
-        height: 3.5em; 
-        background-color: #1E3A8A; 
-        color: white; 
-        font-weight: bold; 
-        font-size: 1.1em;
+        width: 100%; border-radius: 12px; height: 3.5em; 
+        background-color: #1E3A8A; color: white; font-weight: bold; 
+        font-size: 1.1em; transition: 0.3s;
     }
-    .report-box { 
-        padding: 20px; 
-        border-radius: 15px; 
-        background-color: white; 
-        border-right: 10px solid #1E3A8A; 
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    .stButton>button:hover { background-color: #2563EB; border: none; }
+    .report-card { 
+        padding: 25px; border-radius: 15px; background-color: white; 
+        border-right: 10px solid #1E3A8A; box-shadow: 0 10px 20px rgba(0,0,0,0.05);
     }
     </style>
     """, unsafe_allow_html=True)
 
 # قائمة الأمراض الـ 24
 DISEASES = {
-    0: "حب الشباب والوردية", 1: "التقرن الضوئي", 2: "التهاب الجلد التأتبي", 
-    3: "سرطان الخلايا القاعدية", 4: "آفات حميدة", 5: "أمراض جلدية فقاعية",
-    6: "التهاب النسيج الخلوي", 7: "الطفح الدوائي", 8: "الأكزيما", 
-    9: "الأمراض الخارجية", 10: "العدوى الفطرية", 11: "الهربس والزوائد",
-    12: "الأمراض الجلدية الخفيفة", 13: "الورم الميلانيني", 14: "الوحمات والشامات",
-    15: "أورام ليمفاوية", 16: "الصدفية والقمط", 17: "لسعات الحشرات",
-    18: "القرنية الدهنية", 19: "سرطان الخلايا الحرشفية", 20: "السعفة",
-    21: "الشري والحساسية", 22: "الأورام الوعائية", 23: "الثآليل"
+    0: "Acne and Rosacea", 1: "Actinic Keratosis", 2: "Atopic Dermatitis", 
+    3: "Basal Cell Carcinoma", 4: "Benign Keratosis", 5: "Bullous Disease",
+    6: "Cellulitis", 7: "Drug Eruptions", 8: "Eczema", 9: "Exanthems",
+    10: "Fungal Infections", 11: "Herpes HPV", 12: "Light Diseases",
+    13: "Melanoma", 14: "Nevi and Moles", 15: "Lymphoma",
+    16: "Psoriasis Lichen Planus", 17: "Scabies and Bites",
+    18: "Seborrheic Keratosis", 19: "Squamous Cell Carcinoma",
+    20: "Tinea Ringworm", 21: "Urticaria Hives", 22: "Vascular Tumors", 23: "Warts"
 }
 
-# --- 2. وظيفة تحميل النموذج ومعالجة الخطأ ---
+# --- 2. محرك تحميل النموذج الذكي ---
 @st.cache_resource
 def load_ai_engine():
     file_id = '1lMGCojHeGupFunhxX5GnLOiUgxWbbRC5'
@@ -59,9 +50,9 @@ def load_ai_engine():
     extract_folder = "model_dir"
 
     try:
-        # تحميل الملف من Google Drive
+        # تحميل من Google Drive
         if not os.path.exists(zip_file):
-            with st.spinner("⏳ جاري سحب محرك الذكاء الاصطناعي..."):
+            with st.spinner("⏳ جاري تحميل الأوزان من سحابة Google..."):
                 gdown.download(download_url, zip_file, quiet=False)
         
         # فك الضغط
@@ -77,81 +68,87 @@ def load_ai_engine():
                     break
         
         if h5_path:
-            # الحل النهائي لمشكلة Layer mismatch:
-            # نحاول تحميل النموذج كملف كامل أولاً، وإذا فشل نبني الهيكل ونحمل الأوزان بمرونة
-            try:
-                model = tf.keras.models.load_model(h5_path, compile=False)
-            except Exception:
-                # بناء هيكل بديل متوافق مع MobileNetV2 (الأكثر شيوعاً في هذه الأوزان)
-                base = tf.keras.applications.MobileNetV2(input_shape=(224,224,3), include_top=False, weights=None)
-                x = tf.keras.layers.GlobalAveragePooling2D()(base.output)
-                output = tf.keras.layers.Dense(24, activation='softmax')(x)
-                model = tf.keras.Model(inputs=base.input, outputs=output)
-                # تحميل الأوزان مع تخطي الطبقات غير المتطابقة
-                model.load_weights(h5_path, by_name=True, skip_mismatch=True)
+            # بناء الهيكل الهجين (Hybrid) ليتناسب مع أوزانك المكونة من +200 طبقة
+            base1 = tf.keras.applications.EfficientNetB0(input_shape=(224,224,3), include_top=False, weights=None)
+            base2 = tf.keras.applications.MobileNetV2(input_shape=(224,224,3), include_top=False, weights=None)
+            
+            x1 = tf.keras.layers.GlobalAveragePooling2D()(base1.output)
+            x2 = tf.keras.layers.GlobalAveragePooling2D()(base2.output)
+            merged = tf.keras.layers.Concatenate()([x1, x2])
+            
+            top = tf.keras.layers.Dense(512, activation='relu')(merged)
+            top = tf.keras.layers.Dropout(0.4)(top)
+            output = tf.keras.layers.Dense(24, activation='softmax')(top)
+            
+            model = tf.keras.Model(inputs=[base1.input, base2.input], outputs=output)
+            
+            # تحميل الأوزان
+            model.load_weights(h5_path)
             return model
     except Exception as e:
-        st.error(f"⚠️ لم نتمكن من تشغيل المحرك: {e}")
+        st.error(f"⚠️ خطأ في المحرك: {e}")
     return None
 
 model = load_ai_engine()
 
-# --- 3. واجهة المستخدم ---
-st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>نظام خبير الجلد بالذكاء الاصطناعي 🧬</h1>", unsafe_allow_html=True)
+# --- 3. تصميم واجهة المستخدم ---
+st.markdown("<h1 style='text-align:center; color:#1E3A8A;'>الذكاء الاصطناعي لفحص الجلد 🧬</h1>", unsafe_allow_html=True)
 
-c1, c2 = st.columns(2)
-with c1:
-    lang = st.selectbox("🌐 لغة العرض", ["العربية", "English"])
-with c2:
-    with st.expander("📖 الدليل الطبي للأمراض"):
+# الأدوات العلوية
+col_lang, col_guide = st.columns(2)
+with col_lang:
+    st.selectbox("🌐 اختر لغة التقارير", ["العربية (Arabic)", "English"])
+with col_guide:
+    with st.expander("📖 الدليل الطبي للفئات"):
         for i, name in DISEASES.items():
             st.write(f"• {name}")
 
-st.write("---")
+st.divider()
 
-# خيارات الإدخال
-tab1, tab2 = st.tabs(["📤 رفع صورة من الجهاز", "📸 استخدام الكاميرا"])
+# منطقة الإدخال
+col_in, col_out = st.columns([1, 1])
 
-with tab1:
-    up_file = st.file_uploader("اختر صورة واضحة", type=["jpg", "png", "jpeg"])
-with tab2:
-    cam_file = st.camera_input("التقط صورة للمنطقة المصابة")
-
-source = up_file if up_file else cam_file
-
-if source:
-    col_img, col_res = st.columns([1, 1])
-    img = Image.open(source).convert('RGB')
+with col_in:
+    st.subheader("📸 رفع أو التقاط صورة")
+    source_type = st.radio("وسيلة الإدخال:", ["المعرض 📤", "الكاميرا 📷"])
     
-    with col_img:
-        st.image(img, caption="الصورة المدخلة", use_container_width=True)
-    
-    with col_res:
-        st.subheader("🔍 نتائج التحليل")
-        if st.button("بدء فحص الصورة الآن"):
+    if source_type == "المعرض 📤":
+        file = st.file_uploader("اختر صورة الجلد", type=["jpg", "png", "jpeg"])
+    else:
+        file = st.camera_input("وجه الكاميرا نحو الإصابة")
+
+# منطقة النتائج
+with col_out:
+    st.subheader("🔍 نتيجة الفحص")
+    if file:
+        img = Image.open(file).convert('RGB')
+        st.image(img, use_container_width=True)
+        
+        if st.button("بدء تحليل الصورة الآن"):
             if model:
-                with st.spinner("⏳ جاري تحليل الأنسجة والأنماط..."):
-                    # معالجة الصورة للنموذج
-                    img_arr = cv2.resize(np.array(img), (224, 224))
-                    img_arr = (img_arr.astype(np.float32) / 255.0)[np.newaxis, ...]
+                with st.spinner("⏳ جاري تحليل ملامح الأنسجة..."):
+                    # المعالجة المسبقة
+                    img_ready = cv2.resize(np.array(img), (224, 224))
+                    img_ready = (img_ready.astype(np.float32) / 255.0)[np.newaxis, ...]
                     
-                    # التنبؤ
-                    preds = model.predict(img_arr)[0]
-                    idx = np.argmax(preds)
-                    conf = preds[idx]
+                    # التنبؤ (إرسال مدخلين للموديل الهجين)
+                    prediction = model.predict([img_ready, img_ready])
+                    class_id = np.argmax(prediction[0])
+                    score = prediction[0][class_id]
                     
+                    # عرض النتيجة
                     st.markdown(f"""
-                    <div class="report-box">
-                        <h3 style="color:#1E3A8A;">الحالة المتوقعة: {DISEASES.get(idx, "غير محدد")}</h3>
-                        <p><b>دقة التنبؤ:</b> {conf:.2%}</p>
+                    <div class="report-card">
+                        <h2 style="color:#1E3A8A;">{DISEASES.get(class_id, "غير محدد")}</h2>
+                        <p style="font-size:1.2em;"><b>الدقة:</b> {score:.2%}</p>
                         <hr>
-                        <p style="font-size:0.85em; color:#666;">
-                        تنبيه: النتائج استرشادية فقط بناءً على خوارزميات الذكاء الاصطناعي.
+                        <p style="color:#666; font-size:0.9em;">
+                        ⚠️ ملاحظة: هذا التقرير آلي. يجب مراجعة الطبيب للتشخيص السريري.
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
             else:
-                st.error("المحرك لا يزال في مرحلة التحميل أو هناك خطأ في الرابط.")
+                st.error("المحرك لم يكتمل تحميله بعد، يرجى الانتظار قليلاً.")
 
-st.write("---")
-st.caption("مشروع تخرج - Skin AI Safety System 2026")
+st.divider()
+st.caption("Skin Safety System V3.0 - 졸업 프로젝트 2026")
